@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Unfair Cake Cutter</string>
+
+    <!-- Camera / permission -->
+    <string name="camera_permission_title">Let me see\nthe cake.</string>
+    <string name="camera_permission_body">The cutting guides are drawn on top of your camera. Nothing is recorded, saved or sent anywhere. Pinky promise.</string>
+    <string name="camera_permission_photo">or pick a photo instead</string>
+    <string name="camera_permission_grant">Allow camera</string>
+    <string name="camera_permission_settings">Open app settings</string>
+    <string name="camera_unavailable">No camera available. Pick a photo instead.</string>
+    <string name="photo_load_failed">Couldn\'t open that photo.</string>
+
+    <!-- Preview buttons -->
+    <string name="freeze">Freeze</string>
+    <string name="resume">Resume</string>
+    <string name="photo">Photo</string>
+    <string name="back_to_camera">Camera</string>
+    <string name="frozen_sticker">Frozen. No escape.</string>
+    <string name="snap">Snap</string>
+    <string name="snap_cancel">Cancel</string>
+    <string name="snap_aim">Tap the cake</string>
+    <string name="snap_busy">Sniffing it out…</string>
+    <string name="snap_missed">No cake there. Try again?</string>
+    <string name="snap_done">Snapped!</string>
+
+    <!-- Preview status chip -->
+    <string name="status_live">● LIVE</string>
+    <string name="status_frozen">❚❚ FROZEN</string>
+    <string name="status_photo">PHOTO</string>
+    <string name="app_title_two_lines">Unfair Cake\nCutter</string>
+
+    <!-- Controls -->
+    <string name="people">People</string>
+    <string name="decrease_people">One person fewer</string>
+    <string name="increase_people">One more person</string>
+    <string name="unfairness">Unfairness</string>
+    <string name="reroll">Reroll</string>
+    <string name="shape">Shape</string>
+    <string name="shape_round">Round</string>
+    <string name="shape_rectangle">Rectangle</string>
+    <string name="layout_strips">Strips</string>
+    <string name="layout_grid">Grid</string>
+    <string name="layout_log">Log</string>
+    <string name="size">Size</string>
+    <string name="rotation">Rotation</string>
+    <string name="rotation_value">%1$s°</string>
+    <string name="person_name_label">Name of person %1$d</string>
+    <string name="person_default_name">Person %1$d</string>
+    <string name="everyone_same">Everyone gets the same</string>
+    <string name="biggest_vs_smallest">Biggest slice is %1$s× the smallest</string>
+    <string name="who_gets_what">Who gets what</string>
+    <string name="rig_tip_title">Psst.</string>
+    <string name="rig_tip_body">Long-press a name to hand them the biggest slice, whatever the dice say. Long-press again to play fair. Nobody has to know.</string>
+    <string name="rig_tip_ok">OK, got it</string>
+    <string name="rig_action">Give them the biggest slice</string>
+    <string name="unrig_action">Play fair again</string>
+    <string name="winner">WINNER</string>
+    <string name="scale_fair">Fair</string>
+    <string name="scale_suspicious">Suspicious</string>
+    <string name="scale_tyranny">Tyranny</string>
+
+    <!-- Verdicts -->
+    <string name="verdict_fair">Perfectly fair</string>
+    <string name="verdict_slightly">Slightly generous</string>
+    <string name="verdict_suspicious">Suspicious</string>
+    <string name="verdict_biased">Shamelessly biased</string>
+    <string name="verdict_tyranny">Cake tyranny</string>
+</resources>
