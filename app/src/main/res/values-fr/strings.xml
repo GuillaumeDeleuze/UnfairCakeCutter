@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- French. Typography: a no-break space ( ) before ! ? : and inside « ». -->
+<resources>
+    <!-- The name is a brand: it stays in English. -->
+    <string name="app_name">Unfair Cake Cutter</string>
+    <string name="app_title_two_lines">Unfair Cake\nCutter</string>
+
+    <!-- Camera / permission -->
+    <string name="camera_permission_title">Montre-moi\nle gâteau.</string>
+    <string name="camera_permission_body">Les guides de découpe s\'affichent par-dessus ta caméra. Rien n\'est enregistré, gardé ni envoyé nulle part. Promis juré.</string>
+    <string name="camera_permission_photo">ou choisis plutôt une photo</string>
+    <string name="camera_permission_grant">Autoriser la caméra</string>
+    <string name="camera_permission_settings">Ouvrir les réglages</string>
+    <string name="camera_unavailable">Aucune caméra disponible. Choisis plutôt une photo.</string>
+    <string name="photo_load_failed">Impossible d\'ouvrir cette photo.</string>
+
+    <!-- Preview buttons -->
+    <string name="freeze">Figer</string>
+    <string name="resume">Reprendre</string>
+    <string name="photo">Photo</string>
+    <string name="back_to_camera">Caméra</string>
+    <string name="frozen_sticker">Figé. Pas d\'échappatoire.</string>
+    <string name="snap">Snap</string>
+    <string name="snap_cancel">Annuler</string>
+    <string name="snap_aim">Touche le gâteau</string>
+    <string name="snap_busy">Je cherche…</string>
+    <string name="snap_missed">Pas de gâteau ici. On réessaie ?</string>
+    <string name="snap_done">Trouvé !</string>
+    <string name="snapped_outline">Découpé selon sa vraie forme</string>
+    <string name="snapped_outline_reset">Retirer</string>
+
+    <!-- Preview status chip -->
+    <string name="status_live">● EN DIRECT</string>
+    <string name="status_frozen">❚❚ FIGÉ</string>
+    <string name="status_photo">PHOTO</string>
+
+    <!-- Controls -->
+    <string name="people">Personnes</string>
+    <string name="decrease_people">Une personne de moins</string>
+    <string name="increase_people">Une personne de plus</string>
+    <string name="unfairness">Injustice</string>
+    <string name="reroll">Relancer</string>
+    <string name="shape">Forme</string>
+    <string name="shape_round">Rond</string>
+    <string name="shape_rectangle">Rectangle</string>
+    <string name="layout_strips">Bandes</string>
+    <string name="layout_grid">Grille</string>
+    <string name="layout_log">Bûche</string>
+    <string name="size">Taille</string>
+    <string name="rotation">Rotation</string>
+    <string name="rotation_value">%1$s°</string>
+    <string name="person_name_label">Nom de la personne %1$d</string>
+    <string name="person_default_name">Personne %1$d</string>
+    <string name="default_me">Moi, évidemment</string>
+    <string name="language">Langue</string>
+    <string name="everyone_same">Tout le monde a la même part</string>
+    <string name="biggest_vs_smallest">La plus grosse part fait %1$s× la plus petite</string>
+    <string name="who_gets_what">Qui a quoi</string>
+    <string name="rig_tip_title">Psst.</string>
+    <string name="rig_tip_body">Appui long sur un nom pour lui donner la plus grosse part, quoi qu\'en disent les dés. Encore un appui long pour revenir au hasard. Personne n\'a besoin de savoir.</string>
+    <string name="tip_ok">OK, compris</string>
+    <string name="snap_tip_title">Snap !</string>
+    <string name="snap_tip_body">Vise le gâteau, appuie sur Snap puis touche le gâteau. Ou reste simplement appuyé dessus : le contour suit le gâteau en direct.</string>
+    <string name="rig_action">Lui donner la plus grosse part</string>
+    <string name="unrig_action">Revenir au hasard</string>
+    <string name="winner">GAGNANT</string>
+    <string name="scale_fair">Juste</string>
+    <string name="scale_suspicious">Louche</string>
+    <string name="scale_tyranny">Tyrannie</string>
+
+    <!-- Verdicts -->
+    <string name="verdict_fair">Parfaitement juste</string>
+    <string name="verdict_slightly">Un peu généreux</string>
+    <string name="verdict_suspicious">Louche</string>
+    <string name="verdict_biased">Honteusement biaisé</string>
+    <string name="verdict_tyranny">Tyrannie du gâteau</string>
+
+    <!-- Easter egg: a party of one -->
+    <string name="verdict_all_mine">Tout pour moi.</string>
+    <string name="party_of_one">Table pour un. Aucun témoin.</string>
+    <string name="all_of_it">TOUT</string>
+</resources>

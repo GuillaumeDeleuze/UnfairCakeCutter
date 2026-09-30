@@ -8,6 +8,7 @@ composeBom = "2024.12.01"
 camerax = "1.4.1"
 junit = "4.13.2"
 opencv = "4.14.0"
+appcompat = "1.7.1"
 androidxTestExt = "1.2.1"
 androidxTestRunner = "1.6.2"
 
@@ -31,6 +32,7 @@ androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycl
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 opencv = { group = "org.opencv", name = "opencv", version.ref = "opencv" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExt" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 

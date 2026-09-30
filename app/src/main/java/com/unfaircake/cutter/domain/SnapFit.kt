@@ -54,8 +54,8 @@ object SnapFit {
     private const val SIMPLIFY = 1.0
     private const val MAX_POINTS = 120
 
-    /** Ovals closer to a circle than this are left unturned. */
-    private const val CIRCLE_RATIO = 1.08
+    /** Round cakes less elongated than this are left unturned: their turn would be noise. */
+    private const val CIRCLE_RATIO = 1.2
 
     /** Rectangles at least this many times longer than wide are logs. */
     private const val LOG_RATIO = 2.4
@@ -156,13 +156,30 @@ object SnapFit {
             }
             return doubleArrayOf(u0, u1, v0, v1)
         }
-        var e = extents(t)
+        val e = extents(t)
         if (round && max(e[1] - e[0], e[3] - e[2]) < CIRCLE_RATIO * min(e[1] - e[0], e[3] - e[2])) {
             // Near circle: no point turning it.
             deg = 0.0
-            t = 0.0
-            e = extents(0.0)
         }
+        return frameAt(ring, round, deg)
+    }
+
+    /** [ring] (mask pixels) in the frame turned by [deg] that fits it snugly. */
+    private fun frameAt(ring: List<Pt>, round: Boolean, deg: Double): Result {
+        val t = deg * PI / 180.0
+        var u0 = Double.MAX_VALUE
+        var u1 = -Double.MAX_VALUE
+        var v0 = Double.MAX_VALUE
+        var v1 = -Double.MAX_VALUE
+        val cs = cos(t)
+        val sn = sin(t)
+        for (p in ring) {
+            val u = p.x * cs + p.y * sn
+            val v = -p.x * sn + p.y * cs
+            u0 = min(u0, u); u1 = max(u1, u)
+            v0 = min(v0, v); v1 = max(v1, v)
+        }
+        val e = doubleArrayOf(u0, u1, v0, v1)
         val c = cos(t)
         val s = sin(t)
         val w = max(e[1] - e[0], 1e-6)
@@ -214,6 +231,43 @@ object SnapFit {
             if (best == null || loop.size > best.size) best = loop
         }
         return best?.takeIf { it.size >= 8 }
+    }
+
+    /** The same outline, framed snugly at [rotationDeg] instead (live snaps keep one turn). */
+    fun reframe(result: Result, rotationDeg: Double): Result {
+        val t = result.rotationDeg * PI / 180.0
+        val world = result.outline.map { p ->
+            val u = p.x * result.width
+            val v = p.y * result.height
+            Pt(result.cx + u * cos(t) - v * sin(t), result.cy + u * sin(t) + v * cos(t))
+        }
+        return frameAt(world, result.round, rotationDeg)
+    }
+
+    /**
+     * The same outline in whichever of its quarter-turn frames (sides swapped) turns least from
+     * [previousRotationDeg], so live snaps of a squarish cake don't flip between ±45°.
+     */
+    fun alignTo(result: Result, previousRotationDeg: Double): Result {
+        fun gap(deg: Double): Double {
+            var d = (deg - previousRotationDeg) % 360.0
+            if (d > 180) d -= 360
+            if (d < -180) d += 360
+            return abs(d)
+        }
+        val plus = result.copy(
+            rotationDeg = result.rotationDeg + 90.0,
+            width = result.height,
+            height = result.width,
+            outline = result.outline.map { Pt(it.y, -it.x) },
+        )
+        val minus = result.copy(
+            rotationDeg = result.rotationDeg - 90.0,
+            width = result.height,
+            height = result.width,
+            outline = result.outline.map { Pt(-it.y, it.x) },
+        )
+        return listOf(result, plus, minus).minBy { gap(it.rotationDeg) }
     }
 
     /** Which cake the outline is, keeping the user's tray layout when it still fits. */

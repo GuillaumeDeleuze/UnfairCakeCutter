@@ -58,12 +58,18 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.core.os.LocaleListCompat
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -83,7 +89,6 @@ import com.unfaircake.cutter.domain.MIN_SHAPE_SIZE
 import com.unfaircake.cutter.domain.Shares
 import com.unfaircake.cutter.domain.Verdict
 import com.unfaircake.cutter.ui.CakeUiState
-import com.unfaircake.cutter.ui.CakeViewModel
 import com.unfaircake.cutter.ui.PersonUi
 import com.unfaircake.cutter.ui.components.CandyButton
 import com.unfaircake.cutter.ui.components.CandyCircleButton
@@ -91,6 +96,7 @@ import com.unfaircake.cutter.ui.components.CandyIcons
 import com.unfaircake.cutter.ui.components.CandySegmented
 import com.unfaircake.cutter.ui.components.CandySlider
 import com.unfaircake.cutter.ui.components.CssLines
+import com.unfaircake.cutter.ui.components.FitText
 import com.unfaircake.cutter.ui.components.Pill
 import com.unfaircake.cutter.ui.components.SectionLabel
 import com.unfaircake.cutter.ui.components.SliderLook
@@ -115,6 +121,7 @@ class ControlActions(
     val onToggleFavorite: (Int) -> Unit,
     val onClearOutline: () -> Unit,
     val onDismissRigTip: () -> Unit,
+    val onDismissSnapTip: () -> Unit,
 )
 
 /** How far the panel's rounded top rides up over the camera preview. */
@@ -127,6 +134,7 @@ fun ControlPanel(
     state: CakeUiState,
     actions: ControlActions,
     showRigTip: Boolean,
+    showSnapTip: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(topStart = PanelCorner, topEnd = PanelCorner)
@@ -154,9 +162,26 @@ fun ControlPanel(
             contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = PanelOverlap, bottom = 28.dp),
             modifier = Modifier.fillMaxHeight(),
         ) {
-            if (showRigTip) {
+            // One tip at a time: how to snap first, then the long-press trick.
+            if (showSnapTip) {
+                item(key = "snap-tip") {
+                    TipCard(
+                        title = stringResource(R.string.snap_tip_title),
+                        body = stringResource(R.string.snap_tip_body),
+                        color = Candy.PinkSoft,
+                        onDismiss = actions.onDismissSnapTip,
+                        modifier = Modifier.animateItem().padding(bottom = 20.dp),
+                    )
+                }
+            } else if (showRigTip) {
                 item(key = "rig-tip") {
-                    RigTip(actions.onDismissRigTip, Modifier.animateItem().padding(bottom = 20.dp))
+                    TipCard(
+                        title = stringResource(R.string.rig_tip_title),
+                        body = stringResource(R.string.rig_tip_body),
+                        color = Candy.Yellow,
+                        onDismiss = actions.onDismissRigTip,
+                        modifier = Modifier.animateItem().padding(bottom = 20.dp),
+                    )
                 }
             }
             item(key = "unfairness", contentType = "unfairness") { UnfairnessHeader(state) }
@@ -166,44 +191,68 @@ fun ControlPanel(
             item(key = "who") {
                 SectionLabel(stringResource(R.string.who_gets_what), Modifier.padding(top = 20.dp))
             }
-            val winner = if (state.everyoneGetsTheSame) -1 else state.people.maxByOrNull { it.share }?.index ?: -1
+            val solo = state.peopleCount == 1
+            val winner = when {
+                solo -> 0
+                state.everyoneGetsTheSame -> -1
+                else -> state.people.maxByOrNull { it.share }?.index ?: -1
+            }
             items(state.people, key = { "person-${it.index}" }) { person ->
                 PersonRow(
                     person = person,
                     maxShare = state.maxShare,
                     isWinner = person.index == winner,
+                    badge = if (solo) R.string.all_of_it else R.string.winner,
                     isFavorite = person.index == state.favorite,
                     onNameChange = { actions.onNameChange(person.index, it) },
                     onToggleFavorite = { actions.onToggleFavorite(person.index) },
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
+            item(key = "language") { LanguagePicker(Modifier.padding(top = 20.dp)) }
         }
     }
 }
 
-/** One-time hint about the long-press trick, until "OK, got it". */
+/** English or French, whatever the phone's own language. */
 @Composable
-private fun RigTip(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+private fun LanguagePicker(modifier: Modifier = Modifier) {
+    val current = LocalConfiguration.current.locales[0].language
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = modifier.fillMaxWidth()) {
+        SectionLabel(stringResource(R.string.language))
+        CandySegmented(
+            // Each language in its own words.
+            options = listOf("en" to "English", "fr" to "Français"),
+            selected = if (current == "fr") "fr" else "en",
+            onSelect = { tag ->
+                if (tag != current) AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
+            },
+        )
+    }
+}
+
+/** One-time hint, until "OK, got it". */
+@Composable
+private fun TipCard(title: String, body: String, color: Color, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(18.dp)
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier
             .fillMaxWidth()
             .hardShadow(4.dp, shape)
-            .background(Candy.Yellow, shape)
+            .background(color, shape)
             .border(2.5.dp, Candy.Ink, shape)
             .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
     ) {
         Text(
-            stringResource(R.string.rig_tip_title),
+            title,
             fontFamily = Bagel,
             fontSize = 22.sp,
             color = Candy.Ink,
             modifier = Modifier.graphicsLayer { rotationZ = -3f },
         )
         Text(
-            stringResource(R.string.rig_tip_body),
+            body,
             fontFamily = Bricolage,
             fontSize = 15.sp,
             lineHeight = 20.sp,
@@ -219,7 +268,7 @@ private fun RigTip(onDismiss: () -> Unit, modifier: Modifier = Modifier) {
             horizontalPadding = 16.dp,
             fontSize = 14,
             modifier = Modifier.align(Alignment.End),
-        ) { Text(stringResource(R.string.rig_tip_ok)) }
+        ) { Text(stringResource(R.string.tip_ok)) }
     }
 }
 
@@ -233,29 +282,47 @@ private fun UnfairnessHeader(state: CakeUiState) {
                 style = TextStyle(fontFamily = Bagel, fontSize = 30.sp, lineHeight = 30.sp, color = Candy.Ink),
             )
         }
-        val verdict = stringResource(state.verdict.label())
+        // Easter egg: cutting a cake for one.
+        val solo = state.peopleCount == 1
+        val verdict = stringResource(if (solo) R.string.verdict_all_mine else state.verdict.label())
         // Each new verdict lands with a wobble and a tick.
         val pop = remember { Animatable(1f) }
         val tick = rememberTick()
-        var lastVerdict by remember { mutableStateOf(state.verdict) }
-        LaunchedEffect(state.verdict) {
-            if (state.verdict == lastVerdict) return@LaunchedEffect
-            lastVerdict = state.verdict
+        var lastVerdict by remember { mutableStateOf(verdict) }
+        LaunchedEffect(verdict) {
+            if (verdict == lastVerdict) return@LaunchedEffect
+            lastVerdict = verdict
             tick()
             pop.snapTo(1.18f)
             pop.animateTo(1f, spring(dampingRatio = 0.3f, stiffness = 380f))
+        }
+        // Short verdicts get the big size, longer ones 40, and anything still too wide for one
+        // line ("Honteusement biaisé") shrinks until it fits.
+        val measurer = rememberTextMeasurer()
+        val density = LocalDensity.current
+        var width by remember { mutableIntStateOf(0) }
+        val verdictSize = remember(verdict, width) {
+            var size = if (verdict.length <= 11) 52 else 40
+            val room = width - with(density) { 10.dp.roundToPx() }
+            while (width > 0 && size > 26 &&
+                measurer.measure(verdict, TextStyle(fontFamily = Bagel, fontSize = size.sp)).size.width > room
+            ) {
+                size -= 2
+            }
+            size
         }
         CssLines(
             text = verdict,
             style = TextStyle(
                 fontFamily = Bagel,
-                // Short verdicts get the big size; long ones stay on one line.
-                fontSize = if (verdict.length <= 11) 52.sp else 40.sp,
-                lineHeight = if (verdict.length <= 11) 52.sp else 40.sp,
+                fontSize = verdictSize.sp,
+                lineHeight = verdictSize.sp,
                 color = Candy.Ink,
                 shadow = hardTextShadow(4.dp, Candy.Pink),
             ),
             modifier = Modifier
+                .fillMaxWidth()
+                .onSizeChanged { width = it.width }
                 .padding(top = 6.dp, bottom = 4.dp)
                 .graphicsLayer {
                     rotationZ = -2.5f - (pop.value - 1f) * 20f
@@ -264,7 +331,9 @@ private fun UnfairnessHeader(state: CakeUiState) {
                     transformOrigin = TransformOrigin(0f, 0.5f)
                 },
         )
-        val ratio = if (state.everyoneGetsTheSame) {
+        val ratio = if (solo) {
+            stringResource(R.string.party_of_one)
+        } else if (state.everyoneGetsTheSame) {
             stringResource(R.string.everyone_same)
         } else {
             stringResource(R.string.biggest_vs_smallest, Shares.formatRatio(state.maxMinRatio))
@@ -323,13 +392,11 @@ private fun PeopleRow(count: Int, actions: ControlActions, modifier: Modifier = 
                 .border(3.dp, Candy.Ink, Pill)
                 .padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
         ) {
-            Text(
+            // "Personnes" needs more room than "People": it shrinks a little instead of wrapping.
+            FitText(
                 stringResource(R.string.people),
-                fontFamily = Bricolage,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Candy.Ink,
-                modifier = Modifier.weight(1f),
+                style = TextStyle(fontFamily = Bricolage, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Candy.Ink),
+                modifier = Modifier.weight(1f).padding(end = 6.dp),
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CandyCircleButton(
@@ -506,6 +573,7 @@ private fun PersonRow(
     person: PersonUi,
     maxShare: Double,
     isWinner: Boolean,
+    badge: Int,
     isFavorite: Boolean,
     onNameChange: (String) -> Unit,
     onToggleFavorite: () -> Unit,
@@ -514,7 +582,8 @@ private fun PersonRow(
     val color = sliceColor(person.index)
     val cardShape = RoundedCornerShape(18.dp)
     val fieldLabel = stringResource(R.string.person_name_label, person.index + 1)
-    val placeholder = if (person.index == 0) CakeViewModel.ME else stringResource(R.string.person_default_name, person.index + 1)
+    // Person 1 holds the phone.
+    val placeholder = if (person.index == 0) stringResource(R.string.default_me) else stringResource(R.string.person_default_name, person.index + 1)
     val nameStyle = TextStyle(fontFamily = Bricolage, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Candy.Ink)
     val density = LocalDensity.current
 
@@ -637,7 +706,7 @@ private fun PersonRow(
                 } else {
                     Text(
                         text = field.text.ifEmpty { placeholder },
-                        style = if (field.text.isEmpty()) nameStyle.copy(color = Candy.Muted) else nameStyle,
+                        style = nameStyle,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
@@ -650,7 +719,7 @@ private fun PersonRow(
                     )
                     if (isWinner) {
                         Text(
-                            text = stringResource(R.string.winner),
+                            text = stringResource(badge),
                             fontFamily = Bricolage,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold,

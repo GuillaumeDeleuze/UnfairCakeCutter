@@ -40,6 +40,11 @@ android {
         compose = true
     }
 
+    // English and French; the list shows in Android 13+ per-app language settings.
+    androidResources {
+        generateLocaleConfig = true
+    }
+
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -53,6 +58,8 @@ kotlin {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    // Per-app language (English / French) back to Android 8.
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)

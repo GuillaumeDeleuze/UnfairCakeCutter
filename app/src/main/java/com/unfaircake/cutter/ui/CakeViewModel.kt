@@ -262,9 +262,7 @@ class CakeViewModel(
         private const val KEY_OUTLINE = "outline"
         const val NO_FAVORITE = -1
 
-        /** Whoever holds the phone is person 1. */
-        const val ME = "Me, obviously"
-
-        fun defaultName(index: Int) = if (index == 0) ME else "Person ${index + 1}"
+        /** No name yet: the screen shows a default in the current language ("Me, obviously"…). */
+        fun defaultName(@Suppress("UNUSED_PARAMETER") index: Int) = ""
     }
 }

@@ -67,6 +67,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -273,6 +274,25 @@ fun CssLines(
                 },
             )
         }
+    }
+}
+
+/** One line of text that shrinks (down to [minFontSize]) rather than wrap when space runs out. */
+@Composable
+fun FitText(text: String, style: TextStyle, modifier: Modifier = Modifier, minFontSize: TextUnit = 11.sp) {
+    BoxWithConstraints(modifier) {
+        val measurer = rememberTextMeasurer()
+        val room = constraints.maxWidth
+        val size = remember(text, style, room) {
+            var s = style.fontSize.value
+            while (s > minFontSize.value &&
+                measurer.measure(text, style.copy(fontSize = s.sp), maxLines = 1, softWrap = false).size.width > room
+            ) {
+                s -= 0.5f
+            }
+            s
+        }
+        Text(text, style = style.copy(fontSize = size.sp), maxLines = 1, softWrap = false)
     }
 }
 

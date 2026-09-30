@@ -232,4 +232,51 @@ class SnapFitTest {
         val r = SnapFit.fromMask(m, w, h, 160, 120)!!
         assertTrue("round", r.round)
     }
+
+    @Test
+    fun liveSnapsKeepTheirOrientation() {
+        // A squarish cake read at +44° after -44°: the same frame turned a quarter.
+        val r = SnapFit.Result(
+            round = false, cx = 100.0, cy = 80.0, width = 60.0, height = 40.0, rotationDeg = 44.0,
+            outline = listOf(Pt(-0.5, -0.5), Pt(0.5, -0.5), Pt(0.5, 0.5), Pt(-0.2, 0.5)),
+        )
+        val a = SnapFit.alignTo(r, previousRotationDeg = -44.0)
+        assertEquals(-46.0, a.rotationDeg, 1e-9)
+        assertEquals(40.0, a.width, 1e-9)
+        assertEquals(60.0, a.height, 1e-9)
+        // Same outline in the image: every point lands where it was.
+        fun world(q: SnapFit.Result) = q.outline.map { p ->
+            val t = q.rotationDeg * PI / 180.0
+            val u = p.x * q.width
+            val v = p.y * q.height
+            Pt(q.cx + u * cos(t) - v * sin(t), q.cy + u * sin(t) + v * cos(t))
+        }
+        world(r).zip(world(a)).forEach { (p, q) ->
+            assertEquals(p.x, q.x, 1e-9)
+            assertEquals(p.y, q.y, 1e-9)
+        }
+        // Already close: untouched.
+        assertEquals(r, SnapFit.alignTo(r, previousRotationDeg = 30.0))
+    }
+
+    @Test
+    fun reframeKeepsTheOutlineAndTakesTheAngle() {
+        val m = mask(160.0, 120.0, 80.0, 60.0, 0.0, round = false)
+        val r = SnapFit.fromMask(m, w, h, 160, 120)!!
+        val turned = SnapFit.reframe(r, 20.0)
+        assertEquals(20.0, turned.rotationDeg, 1e-9)
+        assertTrue(turned.outline.all { abs(it.x) <= 0.5001 && abs(it.y) <= 0.5001 })
+        assertEquals(Freeform.area(outlineInMask(r)), Freeform.area(outlineInMask(turned)), 1e-6)
+        val a = Freeform.centroid(outlineInMask(r))
+        val b = Freeform.centroid(outlineInMask(turned))
+        assertEquals(a.x, b.x, 1e-6)
+        assertEquals(a.y, b.y, 1e-6)
+    }
+
+    @Test
+    fun squarishRoundCakeIsNotTurned() {
+        val m = mask(160.0, 120.0, 80.0, 70.0, 30.0, round = true)
+        val r = SnapFit.fromMask(m, w, h, 160, 120)!!
+        assertEquals(0.0, r.rotationDeg, 0.0)
+    }
 }

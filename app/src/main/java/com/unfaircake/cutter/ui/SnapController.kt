@@ -59,9 +59,14 @@ class SnapController(private val scope: CoroutineScope, private val viewModel: C
 
     val aiming: Boolean get() = phase == SnapPhase.Aim || phase == SnapPhase.Busy || phase == SnapPhase.Missed
 
+    /** A finger is held on the preview: the outline follows the cake under it, live. */
+    var holding by mutableStateOf(false)
+        private set
+
     /** Snap froze the camera itself, so cancelling should let it run again. */
     private var froze = false
     private var job: Job? = null
+    private var holdTarget = Offset.Zero
 
     fun toggle(liveCamera: Boolean, frozen: Boolean) {
         if (aiming) {
@@ -79,6 +84,7 @@ class SnapController(private val scope: CoroutineScope, private val viewModel: C
 
     fun cancel() {
         job?.cancel()
+        holding = false
         phase = SnapPhase.Off
         tap = null
         if (froze) viewModel.unfreeze()
@@ -88,9 +94,71 @@ class SnapController(private val scope: CoroutineScope, private val viewModel: C
     /** The background changed under us (photo picked, back to camera): start over. */
     fun reset() {
         job?.cancel()
+        holding = false
         phase = SnapPhase.Off
         tap = null
         froze = false
+    }
+
+    /**
+     * Press and hold: snaps to the cake under the finger, then keeps re-snapping on the live
+     * picture until the finger lifts, so the outline follows the cake as the phone moves. On a
+     * still picture (frozen, photo) one snap is enough. The kind of cut is settled by the first
+     * snap so it doesn't flicker between wedges and strips.
+     */
+    fun startHold(position: Offset, overlaySize: IntSize, live: Boolean, currentShape: () -> CakeShape) {
+        if (aiming || holding) return
+        job?.cancel()
+        holding = true
+        holdTarget = position
+        tap = position
+        phase = SnapPhase.Off
+        job = scope.launch {
+            var shape: CakeShape? = null
+            // The first snap settles the turn; later ones are framed at the same angle.
+            var turn: Double? = null
+            while (holding) {
+                val target = holdTarget
+                val frame = grabber.grab()
+                val result = frame?.let { withContext(Dispatchers.Default) { CakeSnapper.snap(it, target.x, target.y) } }
+                    ?.let { r -> turn?.let { SnapFit.reframe(r, it) } ?: keepTurn(r).also { turn = it.rotationDeg } }
+                if (result != null) {
+                    val kind = shape ?: SnapFit.shapeFor(result, currentShape()).also { shape = it }
+                    viewModel.applySnap(
+                        kind,
+                        SnapFit.toTransform(result, overlaySize.width.toFloat(), overlaySize.height.toFloat()),
+                        result.outline,
+                    )
+                    token++
+                    phase = SnapPhase.Done
+                } else if (shape == null) {
+                    phase = SnapPhase.Missed
+                }
+                if (!live) break
+                delay(HOLD_REFRESH_MS)
+            }
+        }
+    }
+
+    /** Turn the new outline as little as possible from where the current one stands. */
+    private fun keepTurn(result: SnapFit.Result): SnapFit.Result =
+        SnapFit.alignTo(result, viewModel.uiState.value.transform.rotationDeg.toDouble())
+
+    fun moveHold(position: Offset) {
+        if (!holding) return
+        holdTarget = position
+        tap = position
+    }
+
+    fun endHold() {
+        if (!holding) return
+        holding = false
+        tap = null
+        val shown = phase
+        scope.launch {
+            delay(1200)
+            if (!holding && !aiming && phase == shown) phase = SnapPhase.Off
+        }
     }
 
     fun onTap(position: Offset, overlaySize: IntSize, currentShape: CakeShape) {
@@ -101,6 +169,7 @@ class SnapController(private val scope: CoroutineScope, private val viewModel: C
             // The overlay and the frame share their top-left corner and pixel scale.
             val frame = grabber.grab()
             val result = frame?.let { withContext(Dispatchers.Default) { CakeSnapper.snap(it, position.x, position.y) } }
+                ?.let(::keepTurn)
             tap = null
             if (result == null) {
                 phase = SnapPhase.Missed
@@ -120,6 +189,9 @@ class SnapController(private val scope: CoroutineScope, private val viewModel: C
         }
     }
 }
+
+/** Pause between two live snaps while a finger is held. */
+private const val HOLD_REFRESH_MS = 300L
 
 @Composable
 fun rememberSnapController(viewModel: CakeViewModel): SnapController {

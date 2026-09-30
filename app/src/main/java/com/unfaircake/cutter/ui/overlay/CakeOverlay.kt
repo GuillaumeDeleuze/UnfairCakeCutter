@@ -97,6 +97,9 @@ fun CakeOverlay(
     onSnapTap: (Offset, IntSize) -> Unit = { _, _ -> },
     snapToken: Int = 0,
     freeform: List<Pt>? = null,
+    onHold: (Offset, IntSize) -> Unit = { _, _ -> },
+    onHoldMove: (Offset) -> Unit = {},
+    onHoldEnd: () -> Unit = {},
 ) {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
@@ -137,6 +140,9 @@ fun CakeOverlay(
     val currentOnChange by rememberUpdatedState(onTransformChange)
     val currentSnapping by rememberUpdatedState(snapping)
     val currentOnSnapTap by rememberUpdatedState(onSnapTap)
+    val currentOnHold by rememberUpdatedState(onHold)
+    val currentOnHoldMove by rememberUpdatedState(onHoldMove)
+    val currentOnHoldEnd by rememberUpdatedState(onHoldEnd)
 
     val gestures = Modifier.pointerInput(metrics) {
         awaitEachGesture {
@@ -161,6 +167,43 @@ fun CakeOverlay(
             var frame = currentTransform.toFrame(w, h)
             val downPos = down.position.toVec()
             val corner = frame.hitCorner(downPos, metrics.handleHitRadius)
+
+            // A finger that stays put is a live snap on whatever is under it; one that moves,
+            // or a second finger, is a drag, a pinch or a stretch as before.
+            var outcome = Press.Hold
+            withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id }
+                    if (change == null || !change.pressed) {
+                        outcome = Press.Tap
+                        break
+                    }
+                    val slid = (change.position - down.position).getDistance() > viewConfiguration.touchSlop
+                    if (slid || event.changes.count { it.pressed } > 1) {
+                        outcome = Press.Move
+                        break
+                    }
+                }
+            }
+            if (outcome == Press.Tap) return@awaitEachGesture
+            if (outcome == Press.Hold) {
+                down.consume()
+                currentOnHold(down.position, size)
+                try {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) break
+                        // The finger can slide onto the cake while held.
+                        if (change.positionChanged()) currentOnHoldMove(change.position)
+                        change.consume()
+                    }
+                } finally {
+                    currentOnHoldEnd()
+                }
+                return@awaitEachGesture
+            }
 
             when {
                 corner != null -> {
@@ -290,6 +333,8 @@ private class OverlayMetrics(
     val dash: Float,
     val boxWidth: Float,
 )
+
+private enum class Press { Tap, Hold, Move }
 
 /** A label to draw upright at [anchor] (local frame), with an optional leader line. */
 private class PieceLabel(val index: Int, val anchor: Offset, val leaderFrom: Offset? = null)

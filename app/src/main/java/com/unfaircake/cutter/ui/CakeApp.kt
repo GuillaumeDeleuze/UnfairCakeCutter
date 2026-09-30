@@ -52,15 +52,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.TransformOrigin
@@ -98,6 +103,9 @@ import com.unfaircake.cutter.ui.overlay.CakeOverlay
 import com.unfaircake.cutter.ui.theme.Bagel
 import com.unfaircake.cutter.ui.theme.Bricolage
 import com.unfaircake.cutter.ui.theme.Candy
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.random.Random
 import com.unfaircake.cutter.ui.theme.ExactLineHeight
 
 @Composable
@@ -132,12 +140,21 @@ fun CakeApp(viewModel: CakeViewModel = viewModel()) {
     }
 
     val snap = rememberSnapController(viewModel)
+
+    // Easter egg: going down to one person throws sprinkles.
+    var party by remember { mutableIntStateOf(0) }
+    var lastCount by remember { mutableIntStateOf(state.peopleCount) }
+    LaunchedEffect(state.peopleCount) {
+        if (state.peopleCount == 1 && lastCount > 1) party++
+        lastCount = state.peopleCount
+    }
     // A new background means the old frame is gone: drop any snap in progress.
     LaunchedEffect(state.photoUri) { snap.reset() }
 
     // The long-press tip shows until "OK, got it", once per install.
     val prefs = remember(context) { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
     var showRigTip by remember { mutableStateOf(!prefs.getBoolean(KEY_RIG_TIP_DISMISSED, false)) }
+    var showSnapTip by remember { mutableStateOf(!prefs.getBoolean(KEY_SNAP_TIP_DISMISSED, false)) }
 
     val actions = remember(viewModel) {
         ControlActions(
@@ -151,6 +168,10 @@ fun CakeApp(viewModel: CakeViewModel = viewModel()) {
             onNameChange = viewModel::setName,
             onToggleFavorite = viewModel::toggleFavorite,
             onClearOutline = viewModel::clearOutline,
+            onDismissSnapTip = {
+                showSnapTip = false
+                prefs.edit().putBoolean(KEY_SNAP_TIP_DISMISSED, true).apply()
+            },
             onDismissRigTip = {
                 showRigTip = false
                 prefs.edit().putBoolean(KEY_RIG_TIP_DISMISSED, true).apply()
@@ -183,6 +204,7 @@ fun CakeApp(viewModel: CakeViewModel = viewModel()) {
         PreviewArea(
             state = state,
             snap = snap,
+            party = party,
             hasCamera = hasCamera && !cameraBroken,
             onCameraUnavailable = { cameraBroken = true },
             onToggleFreeze = viewModel::toggleFreeze,
@@ -200,6 +222,7 @@ fun CakeApp(viewModel: CakeViewModel = viewModel()) {
             state = state,
             actions = actions,
             showRigTip = showRigTip,
+            showSnapTip = showSnapTip,
             modifier = Modifier.fillMaxSize().padding(top = previewVisible),
         )
     }
@@ -207,6 +230,7 @@ fun CakeApp(viewModel: CakeViewModel = viewModel()) {
 
 private const val PREFS = "unfair_cake"
 private const val KEY_RIG_TIP_DISMISSED = "rig_tip_dismissed"
+private const val KEY_SNAP_TIP_DISMISSED = "snap_tip_dismissed"
 
 /** Share of the screen height left visible for the camera, above the panel. */
 private const val PREVIEW_SHARE = 0.54f
@@ -215,6 +239,7 @@ private const val PREVIEW_SHARE = 0.54f
 private fun PreviewArea(
     state: CakeUiState,
     snap: SnapController,
+    party: Int,
     hasCamera: Boolean,
     onCameraUnavailable: () -> Unit,
     onToggleFreeze: () -> Unit,
@@ -226,6 +251,7 @@ private fun PreviewArea(
     modifier: Modifier = Modifier,
 ) {
     val photo = state.photoUri
+    val currentShape by rememberUpdatedState(state.shape)
     Box(modifier.clipToBounds().background(Candy.Night)) {
         val showOverlay = when {
             photo != null -> {
@@ -268,16 +294,23 @@ private fun PreviewArea(
                 onSnapTap = { position, size -> snap.onTap(position, size, state.shape) },
                 snapToken = snap.token,
                 freeform = state.outline,
+                onHold = { position, size ->
+                    snap.startHold(position, size, live = photo == null && hasCamera && !state.frozen) { currentShape }
+                },
+                onHoldMove = snap::moveHold,
+                onHoldEnd = snap::endHold,
                 // Leave the part hidden under the panel out of the cake's working area.
                 modifier = Modifier.fillMaxSize().padding(bottom = PanelOverlap),
             )
         }
 
         snap.tap?.let { SearchPulse(it) }
+        if (party > 0) key(party) { SprinkleBurst() }
         val tick = rememberTick()
         LaunchedEffect(snap.phase) {
             if (snap.phase == SnapPhase.Done || snap.phase == SnapPhase.Missed) tick()
         }
+        LaunchedEffect(snap.holding) { if (snap.holding) tick() }
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -294,16 +327,25 @@ private fun PreviewArea(
                     else -> null
                 },
             )
-            val sticker = when (snap.phase) {
-                SnapPhase.Aim -> R.string.snap_aim
-                SnapPhase.Busy -> R.string.snap_busy
-                SnapPhase.Missed -> R.string.snap_missed
-                SnapPhase.Done -> R.string.snap_done
-                SnapPhase.Off -> if (photo == null && hasCamera && state.frozen) R.string.frozen_sticker else null
-            }
-            if (sticker != null) {
-                // Keyed so each new message slaps down with its own bounce.
-                key(sticker) { Sticker(stringResource(sticker), Modifier.padding(top = 26.dp)) }
+        }
+
+        val sticker = when (snap.phase) {
+            SnapPhase.Aim -> R.string.snap_aim
+            SnapPhase.Busy -> R.string.snap_busy
+            SnapPhase.Missed -> R.string.snap_missed
+            SnapPhase.Done -> R.string.snap_done
+            SnapPhase.Off -> if (photo == null && hasCamera && state.frozen) R.string.frozen_sticker else null
+        }
+        if (sticker != null) {
+            // Tucked under the status chip, top right, clear of the cake in the middle.
+            key(sticker) {
+                Sticker(
+                    stringResource(sticker),
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                        .padding(top = 62.dp, end = 16.dp),
+                )
             }
         }
 
@@ -390,7 +432,7 @@ private fun Sticker(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         fontFamily = Bagel,
-        fontSize = 20.sp,
+        fontSize = 16.sp,
         color = Candy.Magenta,
         modifier = modifier
             .graphicsLayer {
@@ -399,11 +441,66 @@ private fun Sticker(text: String, modifier: Modifier = Modifier) {
                 scaleY = slap.value
                 alpha = slap.value.coerceIn(0f, 1f)
             }
-            .hardShadow(4.dp, shape)
+            .hardShadow(3.dp, shape)
             .background(Candy.White, shape)
-            .border(3.dp, Candy.Ink, shape)
-            .padding(horizontal = 14.dp, vertical = 6.dp),
+            .border(2.5.dp, Candy.Ink, shape)
+            .padding(horizontal = 11.dp, vertical = 4.dp),
     )
+}
+
+private class Sprinkle(
+    val vx: Float,
+    val vy: Float,
+    val spin: Float,
+    val angle: Float,
+    val color: Color,
+)
+
+/** A burst of candy sprinkles from the middle of the preview, falling back down. */
+@Composable
+private fun SprinkleBurst() {
+    val tick = rememberTick()
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        launch {
+            repeat(3) {
+                tick()
+                delay(110)
+            }
+        }
+        progress.animateTo(1f, tween(durationMillis = 2400, easing = LinearEasing))
+    }
+    val bits = remember {
+        val colors = listOf(Candy.Pink, Candy.Yellow, Color(0xFF5CE1E6), Color(0xFFB388FF), Color(0xFF7CF29A), Color.White)
+        List(110) {
+            Sprinkle(
+                vx = Random.nextFloat() * 2f - 1f,
+                vy = -(0.6f + Random.nextFloat() * 0.9f),
+                spin = (Random.nextFloat() * 2f - 1f) * 3f,
+                angle = Random.nextFloat() * 360f,
+                color = colors[it % colors.size],
+            )
+        }
+    }
+    if (progress.value >= 1f) return
+    Canvas(Modifier.fillMaxSize()) {
+        val t = progress.value * 2.4f
+        val fade = ((1f - progress.value) / 0.25f).coerceIn(0f, 1f)
+        val long = 10.dp.toPx()
+        val thick = 3.2.dp.toPx()
+        bits.forEach { b ->
+            val x = size.width / 2f + b.vx * size.width * 0.55f * t
+            val y = size.height * 0.45f + (b.vy * t + 0.9f * t * t) * size.height * 0.5f
+            rotate(b.angle + b.spin * 360f * t, pivot = Offset(x, y)) {
+                drawRoundRect(
+                    color = b.color.copy(alpha = fade),
+                    topLeft = Offset(x - long / 2f, y - thick / 2f),
+                    size = Size(long, thick),
+                    cornerRadius = CornerRadius(thick / 2f),
+                )
+            }
+        }
+    }
 }
 
 /** Rings rippling out from the tapped point while the outline is worked out. */

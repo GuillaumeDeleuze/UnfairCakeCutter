@@ -49,12 +49,16 @@
     <string name="rotation_value">%1$s°</string>
     <string name="person_name_label">Name of person %1$d</string>
     <string name="person_default_name">Person %1$d</string>
+    <string name="default_me">Me, obviously</string>
+    <string name="language">Language</string>
     <string name="everyone_same">Everyone gets the same</string>
     <string name="biggest_vs_smallest">Biggest slice is %1$s× the smallest</string>
     <string name="who_gets_what">Who gets what</string>
     <string name="rig_tip_title">Psst.</string>
     <string name="rig_tip_body">Long-press a name to hand them the biggest slice, whatever the dice say. Long-press again to play fair. Nobody has to know.</string>
-    <string name="rig_tip_ok">OK, got it</string>
+    <string name="tip_ok">OK, got it</string>
+    <string name="snap_tip_title">Snap it.</string>
+    <string name="snap_tip_body">Aim at the cake, hit Snap, then tap the cake. Or just press and hold on it: the outline follows the cake live.</string>
     <string name="rig_action">Give them the biggest slice</string>
     <string name="unrig_action">Play fair again</string>
     <string name="winner">WINNER</string>
@@ -68,4 +72,9 @@
     <string name="verdict_suspicious">Suspicious</string>
     <string name="verdict_biased">Shamelessly biased</string>
     <string name="verdict_tyranny">Cake tyranny</string>
+
+    <!-- Easter egg: a party of one -->
+    <string name="verdict_all_mine">All mine.</string>
+    <string name="party_of_one">Party of one. No witnesses.</string>
+    <string name="all_of_it">ALL OF IT</string>
 </resources>

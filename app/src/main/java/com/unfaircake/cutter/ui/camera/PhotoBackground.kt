@@ -51,7 +51,8 @@ fun PhotoBackground(
     val currentOnLoadFailed by rememberUpdatedState(onLoadFailed)
     val bitmap by produceState<ImageBitmap?>(initialValue = null, uri) {
         val loaded = withContext(Dispatchers.IO) { loadBitmap(context, uri) }
-        if (loaded == null) currentOnLoadFailed() else value = loaded.asImageBitmap()
+        value = loaded?.asImageBitmap()
+        if (loaded == null) currentOnLoadFailed()
     }
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
     DisposableEffect(grabber) {
