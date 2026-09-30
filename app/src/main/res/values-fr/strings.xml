@@ -25,9 +25,6 @@
     <string name="snap_done">Trouvé !</string>
     <string name="snap_refine">Touche encore pour agrandir</string>
     <string name="snap_finish">Terminé</string>
-    <string name="share">Partager</string>
-    <string name="share_chooser">Partager le verdict</string>
-    <string name="share_text">Découpé avec Totally Fair Cake Cutter. En toute équité, évidemment.</string>
     <string name="snapped_outline">Découpé selon sa vraie forme</string>
     <string name="snapped_outline_reset">Retirer</string>
 
@@ -40,7 +37,7 @@
     <string name="people">Personnes</string>
     <string name="decrease_people">Une personne de moins</string>
     <string name="increase_people">Une personne de plus</string>
-    <string name="unfairness">Injustice</string>
+    <string name="unfairness">Taux d\'injustice</string>
     <string name="reroll">Relancer</string>
     <string name="shape">Forme</string>
     <string name="shape_round">Rond</string>

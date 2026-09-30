@@ -1,17 +1,5 @@
 package com.unfaircake.cutter.ui.overlay
 
-import android.graphics.Bitmap
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
-import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.LayoutDirection
-import com.unfaircake.cutter.ui.theme.Bagel
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -302,102 +290,6 @@ private fun animatedShares(target: List<Double>): List<Double> {
     return if (sum > 0.0) current.map { it / sum } else target
 }
 
-/** The text under the cake in a shared picture. People: number, name, share, in person order. */
-class ShareCard(
-    val verdict: String,
-    val ratio: String,
-    val people: List<Pair<String, String>>,
-    val title: String,
-)
-
-/**
- * The cut as a picture to share: [frame] (what the preview shows, or null) with the cutting
- * guides over it, and a cream band underneath with the verdict and who gets what. [width] and
- * [height] are the overlay's, the frame shares its top-left corner and pixel scale.
- */
-fun renderShareImage(
-    frame: Bitmap?,
-    width: Int,
-    height: Int,
-    shape: CakeShape,
-    transform: ShapeTransform,
-    shares: List<Double>,
-    percentLabels: List<String>,
-    outline: List<Pt>?,
-    card: ShareCard,
-    textMeasurer: TextMeasurer,
-    density: Density,
-): Bitmap = with(density) {
-    val pad = 22.dp.toPx()
-    val inner = (width - 2 * pad).toInt().coerceAtLeast(1)
-    val fits = Constraints(maxWidth = inner)
-
-    // Measure the band first: its height depends on the text.
-    var verdictSize = 44
-    var verdict = textMeasurer.measure(card.verdict, verdictStyle(verdictSize), maxLines = 1, softWrap = false)
-    while (verdict.size.width > inner && verdictSize > 24) {
-        verdictSize -= 2
-        verdict = textMeasurer.measure(card.verdict, verdictStyle(verdictSize), maxLines = 1, softWrap = false)
-    }
-    val ratio = textMeasurer.measure(
-        card.ratio,
-        TextStyle(fontFamily = Bricolage, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Candy.Ink),
-        constraints = fits,
-    )
-    val nameStyle = TextStyle(fontFamily = Bricolage, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Candy.Ink)
-    val shareStyle = TextStyle(fontFamily = Bagel, fontSize = 17.sp, color = Candy.Ink)
-    val row = 30.dp.toPx()
-    val dot = 9.dp.toPx()
-    val percents = card.people.map { textMeasurer.measure(it.second, shareStyle, maxLines = 1) }
-    val names = card.people.mapIndexed { i, p ->
-        val room = (inner - 3 * dot - percents[i].size.width - 8.dp.toPx()).toInt().coerceAtLeast(1)
-        textMeasurer.measure(p.first, nameStyle, maxLines = 1, overflow = TextOverflow.Ellipsis, constraints = Constraints(maxWidth = room))
-    }
-    val title = textMeasurer.measure(card.title, TextStyle(fontFamily = Bagel, fontSize = 16.sp, color = Candy.Magenta), maxLines = 1)
-    val band = pad + verdict.size.height + 4.dp.toPx() + ratio.size.height + 16.dp.toPx() +
-        row * card.people.size + 14.dp.toPx() + title.size.height + pad
-    val total = (height + band).toInt()
-
-    val image = ImageBitmap(width, total)
-    CanvasDrawScope().draw(this, LayoutDirection.Ltr, androidx.compose.ui.graphics.Canvas(image), Size(width.toFloat(), total.toFloat())) {
-        drawRect(Candy.Night, size = Size(width.toFloat(), height.toFloat()))
-        frame?.let { drawImage(it.asImageBitmap()) }
-        clipRect(0f, 0f, width.toFloat(), height.toFloat()) {
-            drawCake(
-                transform.toFrame(width.toFloat(), height.toFloat()), shape, shares, percentLabels,
-                textMeasurer, LabelStyle, overlayMetrics(this@with), outline, handles = false,
-            )
-        }
-
-        // The band, with the panel's ink rule on top.
-        drawRect(Candy.Cream, topLeft = Offset(0f, height.toFloat()), size = Size(width.toFloat(), band))
-        drawLine(Candy.Ink, Offset(0f, height.toFloat()), Offset(width.toFloat(), height.toFloat()), strokeWidth = 3.dp.toPx())
-        var y = height + pad
-        rotate(-2.5f, pivot = Offset(pad, y + verdict.size.height / 2f)) { drawText(verdict, topLeft = Offset(pad, y)) }
-        y += verdict.size.height + 4.dp.toPx()
-        drawText(ratio, topLeft = Offset(pad, y))
-        y += ratio.size.height + 16.dp.toPx()
-        card.people.indices.forEach { i ->
-            val cy = y + row / 2f
-            drawCircle(Candy.Ink, radius = dot + 2.dp.toPx(), center = Offset(pad + dot, cy))
-            drawCircle(sliceColor(i), radius = dot, center = Offset(pad + dot, cy))
-            drawText(names[i], topLeft = Offset(pad + 3 * dot, cy - names[i].size.height / 2f))
-            drawText(percents[i], topLeft = Offset(width - pad - percents[i].size.width, cy - percents[i].size.height / 2f))
-            y += row
-        }
-        y += 14.dp.toPx()
-        drawText(title, topLeft = Offset(width - pad - title.size.width, y))
-    }
-    image.asAndroidBitmap()
-}
-
-private fun Density.verdictStyle(size: Int) = TextStyle(
-    fontFamily = Bagel,
-    fontSize = size.sp,
-    color = Candy.Ink,
-    shadow = Shadow(Candy.Pink, Offset(3.dp.toPx(), 3.dp.toPx()), 0f),
-)
-
 private val LabelStyle = TextStyle(
     color = Color.White,
     fontFamily = Bricolage,
@@ -458,7 +350,6 @@ private fun DrawScope.drawCake(
     labelStyle: TextStyle,
     m: OverlayMetrics,
     freeform: List<Pt>?,
-    handles: Boolean = true,
 ) {
     val hw = frame.width / 2f
     val hh = frame.height / 2f
@@ -536,8 +427,8 @@ private fun DrawScope.drawCake(
             drawLine(Color.White, from, label.anchor, strokeWidth = m.leaderWidth)
         }
 
-        // Bounding box (for ovals) and corner handles, only on screen: they are for grabbing.
-        if (handles && (shape.isRound || poly != null)) {
+        // Bounding box (for ovals) and corner handles.
+        if (shape.isRound || poly != null) {
             drawRect(
                 Color.White.copy(alpha = 0.7f),
                 topLeft = Offset(-hw, -hh),
@@ -545,7 +436,7 @@ private fun DrawScope.drawCake(
                 style = Stroke(width = m.boxWidth, pathEffect = PathEffect.dashPathEffect(floatArrayOf(m.dash, m.dash))),
             )
         }
-        if (handles) listOf(Offset(-hw, -hh), Offset(hw, -hh), Offset(hw, hh), Offset(-hw, hh)).forEach { c ->
+        listOf(Offset(-hw, -hh), Offset(hw, -hh), Offset(hw, hh), Offset(-hw, hh)).forEach { c ->
             drawCircle(Candy.Ink, radius = m.handleRadius + m.handleRing, center = c)
             drawCircle(Candy.Pink, radius = m.handleRadius, center = c)
             drawCircle(Color.White, radius = m.handleRadius, center = c, style = Stroke(width = m.handleStroke))

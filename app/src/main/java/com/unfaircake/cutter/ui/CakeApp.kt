@@ -1,7 +1,6 @@
 package com.unfaircake.cutter.ui
 
 import android.Manifest
-import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -57,7 +56,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -77,24 +75,17 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -102,7 +93,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.unfaircake.cutter.R
 import com.unfaircake.cutter.domain.ShapeTransform
-import com.unfaircake.cutter.domain.Shares
 import com.unfaircake.cutter.ui.camera.CameraPreview
 import com.unfaircake.cutter.ui.camera.PhotoBackground
 import com.unfaircake.cutter.ui.components.CandyButton
@@ -115,18 +105,12 @@ import com.unfaircake.cutter.ui.components.rememberTick
 import com.unfaircake.cutter.ui.controls.ControlActions
 import com.unfaircake.cutter.ui.controls.ControlPanel
 import com.unfaircake.cutter.ui.controls.PanelOverlap
-import com.unfaircake.cutter.ui.controls.label
 import com.unfaircake.cutter.ui.overlay.CakeOverlay
-import com.unfaircake.cutter.ui.overlay.ShareCard
-import com.unfaircake.cutter.ui.overlay.renderShareImage
 import com.unfaircake.cutter.ui.theme.Bagel
 import com.unfaircake.cutter.ui.theme.Bricolage
 import com.unfaircake.cutter.ui.theme.Candy
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
 import kotlin.random.Random
 import com.unfaircake.cutter.ui.theme.ExactLineHeight
 
@@ -162,14 +146,6 @@ fun CakeApp(viewModel: CakeViewModel = viewModel(factory = CakeViewModel.Factory
     }
 
     val snap = rememberSnapController(viewModel)
-    // The overlay's size, to draw the cut the same way in a shared picture.
-    var overlaySize by remember { mutableStateOf(IntSize.Zero) }
-    val shareScope = rememberCoroutineScope()
-    val measurer = rememberTextMeasurer()
-    val density = LocalDensity.current
-    val shareVerdict: () -> Unit = {
-        shareScope.launch { shareVerdict(context, viewModel.uiState.value, snap.grabber.grab(), overlaySize, measurer, density) }
-    }
 
     // Easter egg: going down to one person throws sprinkles.
     var party by remember { mutableIntStateOf(0) }
@@ -198,7 +174,6 @@ fun CakeApp(viewModel: CakeViewModel = viewModel(factory = CakeViewModel.Factory
             onNameChange = viewModel::setName,
             onToggleFavorite = viewModel::toggleFavorite,
             onClearOutline = viewModel::clearOutline,
-            onShare = { shareVerdict() },
             onDismissSnapTip = {
                 showSnapTip = false
                 prefs.edit().putBoolean(KEY_SNAP_TIP_DISMISSED, true).apply()
@@ -236,7 +211,6 @@ fun CakeApp(viewModel: CakeViewModel = viewModel(factory = CakeViewModel.Factory
             state = state,
             snap = snap,
             party = party,
-            onOverlaySize = { overlaySize = it },
             hasCamera = hasCamera && !cameraBroken,
             onCameraUnavailable = { cameraBroken = true },
             onToggleFreeze = viewModel::toggleFreeze,
@@ -272,7 +246,6 @@ private fun PreviewArea(
     state: CakeUiState,
     snap: SnapController,
     party: Int,
-    onOverlaySize: (IntSize) -> Unit,
     hasCamera: Boolean,
     onCameraUnavailable: () -> Unit,
     onToggleFreeze: () -> Unit,
@@ -334,7 +307,7 @@ private fun PreviewArea(
                 onHoldMove = snap::moveHold,
                 onHoldEnd = snap::endHold,
                 // Leave the part hidden under the panel out of the cake's working area.
-                modifier = Modifier.fillMaxSize().padding(bottom = PanelOverlap).onSizeChanged(onOverlaySize),
+                modifier = Modifier.fillMaxSize().padding(bottom = PanelOverlap),
             )
         }
 
@@ -768,55 +741,6 @@ private fun CenteredMessage(text: String) {
             textAlign = TextAlign.Center,
         )
     }
-}
-
-/**
- * Draws the cut and the verdict into a picture, saves it in the cache and opens the share
- * sheet. Stays on the phone until the user picks where it goes.
- */
-private suspend fun shareVerdict(
-    context: Context,
-    state: CakeUiState,
-    frame: android.graphics.Bitmap?,
-    overlay: IntSize,
-    measurer: TextMeasurer,
-    density: Density,
-) {
-    if (overlay.width <= 0 || overlay.height <= 0) return
-    val solo = state.peopleCount == 1
-    val card = ShareCard(
-        verdict = context.getString(if (solo) R.string.verdict_all_mine else state.verdict.label()),
-        ratio = when {
-            solo -> context.getString(R.string.party_of_one)
-            state.everyoneGetsTheSame -> context.getString(R.string.everyone_same)
-            else -> context.getString(R.string.biggest_vs_smallest, Shares.formatRatio(state.maxMinRatio))
-        },
-        people = state.people.map { p ->
-            val name = p.name.ifEmpty {
-                if (p.index == 0) context.getString(R.string.default_me) else context.getString(R.string.person_default_name, p.index + 1)
-            }
-            name to p.percentText
-        },
-        title = context.getString(R.string.app_name),
-    )
-    val image = renderShareImage(
-        frame, overlay.width, overlay.height, state.shape, state.transform, state.shares,
-        state.people.map { it.percentText }, state.outline, card, measurer, density,
-    )
-    val uri = withContext(Dispatchers.IO) {
-        val dir = File(context.cacheDir, "shared").apply { mkdirs() }
-        val file = File(dir, "verdict.png")
-        file.outputStream().use { image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
-        FileProvider.getUriForFile(context, "${context.packageName}.files", file)
-    }
-    val send = Intent(Intent.ACTION_SEND)
-        .setType("image/png")
-        .putExtra(Intent.EXTRA_STREAM, uri)
-        .putExtra(Intent.EXTRA_TEXT, context.getString(R.string.share_text))
-        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    // As clip data too, so the share sheet itself may read the picture for its preview.
-    send.clipData = ClipData.newRawUri(null, uri)
-    context.startActivity(Intent.createChooser(send, context.getString(R.string.share_chooser)))
 }
 
 private fun Context.hasCameraPermission(): Boolean =
