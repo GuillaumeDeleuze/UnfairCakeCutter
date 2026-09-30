@@ -49,7 +49,7 @@ To run the unit tests (share algorithm, geometry and gesture maths):
    adb shell am start -n com.unfaircake.cutter/.MainActivity
    ```
 
-   If you already built the APK, `adb install -r app/build/outputs/apk/debug/app-debug.apk` does the same job.
+   If you already built the APK, `adb install -r app/build/outputs/apk/debug/app-arm64-v8a-debug.apk` (or the APK for your phone's CPU) does the same job.
 
    In Android Studio, pick the device in the toolbar and press **Run**.
 
