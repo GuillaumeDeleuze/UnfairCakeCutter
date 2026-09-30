@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Unfair Cake Cutter</string>
+    <!-- The name is a brand, and a joke: it is anything but fair. Same in every language. -->
+    <string name="app_name" translatable="false">Totally Fair Cake Cutter</string>
 
     <!-- Camera / permission -->
     <string name="camera_permission_title">Let me see\nthe cake.</string>
@@ -30,7 +31,11 @@
     <string name="status_live">● LIVE</string>
     <string name="status_frozen">❚❚ FROZEN</string>
     <string name="status_photo">PHOTO</string>
-    <string name="app_title_two_lines">Unfair Cake\nCutter</string>
+    <!-- In-app title: "Totally not Fair" with "not" struck out. -->
+    <string name="title_start" translatable="false">Totally</string>
+    <string name="title_not" translatable="false">not</string>
+    <string name="title_end" translatable="false">Fair</string>
+    <string name="title_second_line" translatable="false">Cake Cutter</string>
 
     <!-- Controls -->
     <string name="people">People</string>

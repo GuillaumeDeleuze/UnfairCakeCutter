@@ -1,4 +1,4 @@
-# Unfair Cake Cutter
+# Totally Fair Cake Cutter
 
 Point your phone's rear camera at a cake and it draws cutting guides over it, live. The cake is split into N slices, and an adjustable "unfairness" level decides how uneven they are.
 

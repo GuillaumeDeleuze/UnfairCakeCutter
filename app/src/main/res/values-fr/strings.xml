@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- French. Typography: a no-break space ( ) before ! ? : and inside « ». -->
 <resources>
-    <!-- The name is a brand: it stays in English. -->
-    <string name="app_name">Unfair Cake Cutter</string>
-    <string name="app_title_two_lines">Unfair Cake\nCutter</string>
 
     <!-- Camera / permission -->
     <string name="camera_permission_title">Montre-moi\nle gâteau.</string>
@@ -66,14 +63,14 @@
     <string name="winner">GAGNANT</string>
     <string name="scale_fair">Juste</string>
     <string name="scale_suspicious">Louche</string>
-    <string name="scale_tyranny">Tyrannie</string>
+    <string name="scale_tyranny">Anarchie</string>
 
     <!-- Verdicts -->
     <string name="verdict_fair">Parfaitement juste</string>
     <string name="verdict_slightly">Un peu généreux</string>
     <string name="verdict_suspicious">Louche</string>
     <string name="verdict_biased">Honteusement biaisé</string>
-    <string name="verdict_tyranny">Tyrannie du gâteau</string>
+    <string name="verdict_tyranny">Anarchie du gâteau</string>
 
     <!-- Easter egg: a party of one -->
     <string name="verdict_all_mine">Tout pour moi.</string>
