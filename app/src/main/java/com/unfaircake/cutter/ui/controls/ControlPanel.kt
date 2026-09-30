@@ -64,12 +64,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.core.os.LocaleListCompat
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -209,25 +206,7 @@ fun ControlPanel(
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
-            item(key = "language") { LanguagePicker(Modifier.padding(top = 20.dp)) }
         }
-    }
-}
-
-/** English or French, whatever the phone's own language. */
-@Composable
-private fun LanguagePicker(modifier: Modifier = Modifier) {
-    val current = LocalConfiguration.current.locales[0].language
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = modifier.fillMaxWidth()) {
-        SectionLabel(stringResource(R.string.language))
-        CandySegmented(
-            // Each language in its own words.
-            options = listOf("en" to "English", "fr" to "Français"),
-            selected = if (current == "fr") "fr" else "en",
-            onSelect = { tag ->
-                if (tag != current) AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
-            },
-        )
     }
 }
 

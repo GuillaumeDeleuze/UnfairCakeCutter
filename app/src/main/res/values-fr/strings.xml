@@ -52,7 +52,7 @@
     <string name="person_name_label">Nom de la personne %1$d</string>
     <string name="person_default_name">Personne %1$d</string>
     <string name="default_me">Moi, évidemment</string>
-    <string name="language">Langue</string>
+    <string name="switch_language">Passer en anglais</string>
     <string name="everyone_same">Tout le monde a la même part</string>
     <string name="biggest_vs_smallest">La plus grosse part fait %1$s× la plus petite</string>
     <string name="who_gets_what">Qui a quoi</string>

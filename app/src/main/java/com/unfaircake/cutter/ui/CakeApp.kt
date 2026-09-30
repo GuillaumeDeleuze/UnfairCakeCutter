@@ -67,10 +67,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -80,7 +82,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
+import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -414,6 +418,7 @@ private fun PreviewHeader(status: Status?) {
                     transformOrigin = TransformOrigin(0f, 0.5f)
                 },
         )
+        LanguageFlag(Modifier.padding(end = 8.dp))
         when (status) {
             Status.Live -> CandyChip(stringResource(R.string.status_live), Candy.Pink)
             Status.Frozen -> CandyChip(stringResource(R.string.status_frozen), Candy.White)
@@ -528,6 +533,50 @@ private fun SearchPulse(center: Offset) {
         drawCircle(Candy.Pink, radius = 6.dp.toPx(), center = center)
         drawCircle(Color.White, radius = 6.dp.toPx(), center = center, style = Stroke(2.dp.toPx()))
     }
+}
+
+/** The current language's flag; a tap switches between English and French. */
+@Composable
+private fun LanguageFlag(modifier: Modifier = Modifier) {
+    val french = LocalConfiguration.current.locales[0].language == "fr"
+    CandyButton(
+        onClick = {
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(if (french) "en" else "fr"))
+        },
+        container = Candy.White,
+        shape = CircleShape,
+        height = 34.dp,
+        shadow = 2.dp,
+        border = 2.5.dp,
+        horizontalPadding = 0.dp,
+        contentDescription = stringResource(R.string.switch_language),
+        modifier = modifier.size(34.dp),
+    ) {
+        Canvas(Modifier.fillMaxSize()) { if (french) drawFrance() else drawUnion() }
+    }
+}
+
+private fun DrawScope.drawFrance() {
+    val third = size.width / 3f
+    drawRect(Color(0xFF0055A4), size = Size(third, size.height))
+    drawRect(Color.White, topLeft = Offset(third, 0f), size = Size(third, size.height))
+    drawRect(Color(0xFFEF4135), topLeft = Offset(2 * third, 0f), size = Size(third, size.height))
+}
+
+/** Union Jack, simplified to read at 34 dp. */
+private fun DrawScope.drawUnion() {
+    val w = size.width
+    val h = size.height
+    drawRect(Color(0xFF012169))
+    val red = Color(0xFFC8102E)
+    drawLine(Color.White, Offset(0f, 0f), Offset(w, h), strokeWidth = w * 0.2f)
+    drawLine(Color.White, Offset(w, 0f), Offset(0f, h), strokeWidth = w * 0.2f)
+    drawLine(red, Offset(0f, 0f), Offset(w, h), strokeWidth = w * 0.07f)
+    drawLine(red, Offset(w, 0f), Offset(0f, h), strokeWidth = w * 0.07f)
+    drawRect(Color.White, topLeft = Offset(w * 0.35f, 0f), size = Size(w * 0.3f, h))
+    drawRect(Color.White, topLeft = Offset(0f, h * 0.35f), size = Size(w, h * 0.3f))
+    drawRect(red, topLeft = Offset(w * 0.41f, 0f), size = Size(w * 0.18f, h))
+    drawRect(red, topLeft = Offset(0f, h * 0.41f), size = Size(w, h * 0.18f))
 }
 
 @Composable
