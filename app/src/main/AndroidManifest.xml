@@ -30,6 +30,17 @@
             </intent-filter>
         </activity>
 
+        <!-- Hands the "share the verdict" picture to the app the user picks. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/share_paths" />
+        </provider>
+
         <!-- Keeps the in-app language choice on Android 12 and older. -->
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"

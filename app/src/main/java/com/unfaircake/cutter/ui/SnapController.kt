@@ -35,6 +35,9 @@ enum class SnapPhase {
 
     /** Outline applied; shown briefly, then back to [Off]. */
     Done,
+
+    /** Outline applied from a tap: more taps add to it, until the user says done. */
+    Refine,
 }
 
 /**
@@ -57,7 +60,14 @@ class SnapController(private val scope: CoroutineScope, private val viewModel: C
 
     val grabber = FrameGrabber()
 
-    val aiming: Boolean get() = phase == SnapPhase.Aim || phase == SnapPhase.Busy || phase == SnapPhase.Missed
+    /** Taps on the preview go to the snap (aim, add), not to the outline's drag and pinch. */
+    val aiming: Boolean get() = phase == SnapPhase.Aim || phase == SnapPhase.Busy || phase == SnapPhase.Missed || phase == SnapPhase.Refine
+
+    /** Still looking for the cake: the guides step back so it shows. Once found, they're back. */
+    val searching: Boolean get() = aiming && refine == null
+
+    /** The cake found so far in this snap session (same still picture), grown by each tap. */
+    private var refine: CakeSnapper.Segment? = null
 
     /** A finger is held on the preview: the outline follows the cake under it, live. */
     var holding by mutableStateOf(false)
@@ -79,12 +89,22 @@ class SnapController(private val scope: CoroutineScope, private val viewModel: C
             froze = true
         }
         tap = null
+        refine = null
         phase = SnapPhase.Aim
+    }
+
+    /** Ends a snap session, keeping the outline (and the frozen picture it fits). */
+    fun done() {
+        job?.cancel()
+        refine = null
+        tap = null
+        phase = SnapPhase.Off
     }
 
     fun cancel() {
         job?.cancel()
         holding = false
+        refine = null
         phase = SnapPhase.Off
         tap = null
         if (froze) viewModel.unfreeze()
@@ -95,6 +115,7 @@ class SnapController(private val scope: CoroutineScope, private val viewModel: C
     fun reset() {
         job?.cancel()
         holding = false
+        refine = null
         phase = SnapPhase.Off
         tap = null
         froze = false
@@ -162,16 +183,26 @@ class SnapController(private val scope: CoroutineScope, private val viewModel: C
     }
 
     fun onTap(position: Offset, overlaySize: IntSize, currentShape: CakeShape) {
-        if (phase != SnapPhase.Aim && phase != SnapPhase.Missed) return
+        if (phase != SnapPhase.Aim && phase != SnapPhase.Missed && phase != SnapPhase.Refine) return
         phase = SnapPhase.Busy
         tap = position
+        val before = refine
         job = scope.launch {
             // The overlay and the frame share their top-left corner and pixel scale.
             val frame = grabber.grab()
-            val result = frame?.let { withContext(Dispatchers.Default) { CakeSnapper.snap(it, position.x, position.y) } }
-                ?.let(::keepTurn)
+            val found = frame?.let { withContext(Dispatchers.Default) { CakeSnapper.segment(it, position.x, position.y) } }
+            // A later tap adds to what the first ones found, on the same still picture.
+            val grown = if (before != null && found != null && found.width == before.width && found.height == before.height) {
+                CakeSnapper.Segment(
+                    SnapFit.merge(before.mask, found.mask, before.width, before.height),
+                    before.width, before.height, before.scale, before.tapX, before.tapY,
+                )
+            } else {
+                found
+            }
+            val result = grown?.let { withContext(Dispatchers.Default) { CakeSnapper.fit(it) } }?.let(::keepTurn)
             tap = null
-            if (result == null) {
+            if (grown == null || result == null) {
                 phase = SnapPhase.Missed
                 return@launch
             }
@@ -183,9 +214,8 @@ class SnapController(private val scope: CoroutineScope, private val viewModel: C
             token++
             // The frame stays frozen: the outline was fitted to it.
             froze = false
-            phase = SnapPhase.Done
-            delay(1400)
-            phase = SnapPhase.Off
+            refine = grown
+            phase = SnapPhase.Refine
         }
     }
 }

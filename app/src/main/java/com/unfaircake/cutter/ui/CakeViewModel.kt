@@ -4,6 +4,11 @@ import android.net.Uri
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewmodel.initializer
+import androidx.lifecycle.viewmodel.viewModelFactory
 import com.unfaircake.cutter.domain.CakeShape
 import com.unfaircake.cutter.domain.DEFAULT_PEOPLE
 import com.unfaircake.cutter.domain.DEFAULT_UNFAIRNESS
@@ -55,22 +60,27 @@ data class CakeUiState(
  */
 class CakeViewModel(
     private val savedState: SavedStateHandle,
+    private val store: PartyStore = NoPartyStore,
 ) : ViewModel() {
 
     private val random: Random = Random.Default
 
-    private var count: Int = (savedState.get<Int>(KEY_COUNT) ?: DEFAULT_PEOPLE).coerceIn(MIN_PEOPLE, MAX_PEOPLE)
-    private var unfairness: Int = (savedState.get<Int>(KEY_UNFAIRNESS) ?: DEFAULT_UNFAIRNESS).coerceIn(0, 100)
-    private var seeds: List<Double> = savedState.get<DoubleArray>(KEY_SEEDS)?.toList().orEmpty()
-    private var names: List<String> = savedState.get<ArrayList<String>>(KEY_NAMES)?.toList().orEmpty()
+    // Rotation or process death restore from the saved state; a fresh start from the store.
+    private val stored: Party? = if (savedState.contains(KEY_COUNT)) null else store.load()
+
+    private var count: Int = (savedState.get<Int>(KEY_COUNT) ?: stored?.count ?: DEFAULT_PEOPLE).coerceIn(MIN_PEOPLE, MAX_PEOPLE)
+    private var unfairness: Int = (savedState.get<Int>(KEY_UNFAIRNESS) ?: stored?.unfairness ?: DEFAULT_UNFAIRNESS).coerceIn(0, 100)
+    private var seeds: List<Double> = savedState.get<DoubleArray>(KEY_SEEDS)?.toList() ?: stored?.seeds.orEmpty()
+    private var names: List<String> = savedState.get<ArrayList<String>>(KEY_NAMES)?.toList() ?: stored?.names.orEmpty()
     private var shape: CakeShape = savedState.get<String>(KEY_SHAPE)
         ?.let { saved -> CakeShape.entries.firstOrNull { it.name == saved } }
+        ?: stored?.shape
         ?: CakeShape.ROUND
     private var transform: ShapeTransform = savedState.get<FloatArray>(KEY_TRANSFORM)
         ?.takeIf { it.size == 5 }
         ?.let { ShapeTransform(it[0], it[1], it[2], it[3], it[4]).clamped() }
         ?: ShapeTransform.defaultFor(shape)
-    private var favorite: Int = savedState.get<Int>(KEY_FAVORITE) ?: NO_FAVORITE
+    private var favorite: Int = savedState.get<Int>(KEY_FAVORITE) ?: stored?.favorite ?: NO_FAVORITE
     private var outline: List<Pt>? = savedState.get<FloatArray>(KEY_OUTLINE)
         ?.takeIf { it.size >= 6 && it.size % 2 == 0 }
         ?.let { a -> List(a.size / 2) { Pt(a[2 * it].toDouble(), a[2 * it + 1].toDouble()) } }
@@ -212,6 +222,7 @@ class CakeViewModel(
     }
 
     private fun persist() {
+        store.save(Party(count, unfairness, seeds, names, shape, favorite))
         savedState[KEY_COUNT] = count
         savedState[KEY_UNFAIRNESS] = unfairness
         savedState[KEY_SEEDS] = seeds.toDoubleArray()
@@ -261,6 +272,13 @@ class CakeViewModel(
         private const val KEY_FAVORITE = "favorite"
         private const val KEY_OUTLINE = "outline"
         const val NO_FAVORITE = -1
+
+        /** Builds the ViewModel with the app's preferences as its [PartyStore]. */
+        val Factory: ViewModelProvider.Factory = viewModelFactory {
+            initializer {
+                CakeViewModel(createSavedStateHandle(), PrefsPartyStore(requireNotNull(this[APPLICATION_KEY])))
+            }
+        }
 
         /** No name yet: the screen shows a default in the current language ("Me, obviously"…). */
         fun defaultName(@Suppress("UNUSED_PARAMETER") index: Int) = ""

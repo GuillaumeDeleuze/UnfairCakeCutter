@@ -279,4 +279,17 @@ class SnapFitTest {
         val r = SnapFit.fromMask(m, w, h, 160, 120)!!
         assertEquals(0.0, r.rotationDeg, 0.0)
     }
+
+    @Test
+    fun aSecondTapAddsTheCrust() {
+        // First tap found the topping; the second found the crust ring, a pixel apart.
+        val topping = mask(160.0, 120.0, 70.0, 70.0, 0.0, round = true)
+        val crust = mask(160.0, 120.0, 90.0, 90.0, 0.0, round = true)
+        val inner = mask(160.0, 120.0, 71.5, 71.5, 0.0, round = true)
+        for (i in crust.indices) if (inner[i]) crust[i] = false
+        val merged = SnapFit.merge(topping, crust, w, h)
+        val r = SnapFit.fromMask(merged, w, h, 160, 120)!!
+        assertEquals(180.0, r.width, 4.0)
+        assertEquals(180.0, r.height, 4.0)
+    }
 }

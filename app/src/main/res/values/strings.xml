@@ -24,6 +24,11 @@
     <string name="snap_busy">Sniffing it out…</string>
     <string name="snap_missed">No cake there. Try again?</string>
     <string name="snap_done">Snapped!</string>
+    <string name="snap_refine">Tap more to add to it</string>
+    <string name="snap_finish">Done</string>
+    <string name="share">Share</string>
+    <string name="share_chooser">Share the verdict</string>
+    <string name="share_text">Cut with Totally Fair Cake Cutter. Totally fair.</string>
     <string name="snapped_outline">Cut to the cake\'s real shape</string>
     <string name="snapped_outline_reset">Reset</string>
 
@@ -31,10 +36,10 @@
     <string name="status_live">● LIVE</string>
     <string name="status_frozen">❚❚ FROZEN</string>
     <string name="status_photo">PHOTO</string>
-    <!-- In-app title: "Totally not Fair" with "not" struck out. -->
+    <!-- In-app title: "Totally Unfair" with the "Un" struck out. -->
     <string name="title_start" translatable="false">Totally</string>
-    <string name="title_not" translatable="false">not</string>
-    <string name="title_end" translatable="false">Fair</string>
+    <string name="title_not" translatable="false">Un</string>
+    <string name="title_end" translatable="false">fair</string>
     <string name="title_second_line" translatable="false">Cake Cutter</string>
 
     <!-- Controls -->

@@ -519,7 +519,11 @@ object CandyIcons {
     val Wand: ImageVector by lazy {
         strokeIcon(2.5f, "M4 20L14.5 9.5", "M16 3v4M14 5h4", "M20 10v3M18.5 11.5h3", "M8.5 3.5v2.5M7.25 4.75h2.5")
     }
-    val Close: ImageVector by lazy { strokeIcon(2.8f, "M6 6l12 12M18 6L6 18") }
+    val Share: ImageVector by lazy {
+        strokeIcon(2.5f, "M12 3v12", "M7.5 7.5L12 3l4.5 4.5", "M5 13v5a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-5")
+    }
+    val Check: ImageVector by lazy { strokeIcon(3f, "M5 12.5l4.5 4.5L19 7.5") }
+        val Close: ImageVector by lazy { strokeIcon(2.8f, "M6 6l12 12M18 6L6 18") }
     val Pencil: ImageVector by lazy { strokeIcon(2.4f, "M4 20h4L19 9l-4-4L4 16z", "M13.5 6.5l4 4") }
     val Reroll: ImageVector by lazy { strokeIcon(2.8f, "M20 12a8 8 0 1 1-2.3-5.7", "M20 4v5h-5") }
     val Play: ImageVector by lazy {

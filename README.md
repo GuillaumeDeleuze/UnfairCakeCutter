@@ -24,7 +24,7 @@ The app only asks for the camera permission. It has no network access and no ana
 ./gradlew assembleDebug
 ```
 
-The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+One APK per CPU family is written to `app/build/outputs/apk/debug/`: `app-arm64-v8a-debug.apk` for most phones, `app-armeabi-v7a-debug.apk` for older ones, `app-x86_64-debug.apk` for the emulator. `./gradlew installDebug` picks the right one.
 
 To run the unit tests (share algorithm, geometry and gesture maths):
 

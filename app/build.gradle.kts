@@ -40,6 +40,17 @@ android {
         compose = true
     }
 
+    // One APK per CPU family instead of one with OpenCV four times over (~150 MB). Phones take
+    // arm64 or armv7; x86_64 is for the emulator. App bundles split the same way on the Play Store.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = false
+        }
+    }
+
     // English and French; the list shows in Android 13+ per-app language settings.
     androidResources {
         generateLocaleConfig = true

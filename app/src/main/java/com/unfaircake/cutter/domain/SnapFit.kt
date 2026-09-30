@@ -270,6 +270,40 @@ object SnapFit {
         return listOf(result, plus, minus).minBy { gap(it.rotationDeg) }
     }
 
+    /**
+     * Two segmentations of the same picture joined into one, small gaps between them closed
+     * (the sauce and the crust of a pizza found by two taps).
+     */
+    fun merge(a: BooleanArray, b: BooleanArray, width: Int, height: Int, gap: Int = 2): BooleanArray {
+        val union = BooleanArray(a.size) { a[it] || b[it] }
+        return erode(dilate(union, width, height, gap), width, height, gap)
+    }
+
+    private fun dilate(m: BooleanArray, width: Int, height: Int, r: Int): BooleanArray = spread(m, width, height, r, value = true)
+
+    private fun erode(m: BooleanArray, width: Int, height: Int, r: Int): BooleanArray = spread(m, width, height, r, value = false)
+
+    /** Square-kernel morphology: a pixel takes [value] if any pixel within [r] has it. */
+    private fun spread(m: BooleanArray, width: Int, height: Int, r: Int, value: Boolean): BooleanArray {
+        val out = BooleanArray(m.size) { !value }
+        for (y in 0 until height) for (x in 0 until width) {
+            var hit = false
+            loop@ for (dy in -r..r) {
+                val yy = y + dy
+                if (yy !in 0 until height) continue
+                for (dx in -r..r) {
+                    val xx = x + dx
+                    if (xx in 0 until width && m[yy * width + xx] == value) {
+                        hit = true
+                        break@loop
+                    }
+                }
+            }
+            out[y * width + x] = if (hit) value else !value
+        }
+        return out
+    }
+
     /** Which cake the outline is, keeping the user's tray layout when it still fits. */
     fun shapeFor(result: Result, current: CakeShape): CakeShape = when {
         result.round -> CakeShape.ROUND

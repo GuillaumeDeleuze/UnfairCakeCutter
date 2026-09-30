@@ -23,6 +23,11 @@
     <string name="snap_busy">Je cherche…</string>
     <string name="snap_missed">Pas de gâteau ici. On réessaie ?</string>
     <string name="snap_done">Trouvé !</string>
+    <string name="snap_refine">Touche encore pour agrandir</string>
+    <string name="snap_finish">Terminé</string>
+    <string name="share">Partager</string>
+    <string name="share_chooser">Partager le verdict</string>
+    <string name="share_text">Découpé avec Totally Fair Cake Cutter. En toute équité, évidemment.</string>
     <string name="snapped_outline">Découpé selon sa vraie forme</string>
     <string name="snapped_outline_reset">Retirer</string>
 

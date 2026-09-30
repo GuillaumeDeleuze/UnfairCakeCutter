@@ -65,10 +65,23 @@ object CakeSnapper {
     }
 
     /**
+     * What GrabCut kept around one tap, on the small working copy of the picture ([scale] times
+     * the frame's size), with the tap in those pixels.
+     */
+    class Segment(val mask: BooleanArray, val width: Int, val height: Int, val scale: Double, val tapX: Int, val tapY: Int)
+
+    /**
      * The outline of the cake under ([tapX], [tapY]), both in [frame] pixels, or null when there
      * is no clear cake there. Takes a few hundred milliseconds: call it off the main thread.
      */
-    fun snap(frame: Bitmap, tapX: Float, tapY: Float): SnapFit.Result? {
+    fun snap(frame: Bitmap, tapX: Float, tapY: Float): SnapFit.Result? = segment(frame, tapX, tapY)?.let(::fit)
+
+    /** [segment]'s outline in frame pixels, or null if it isn't cake-shaped. */
+    fun fit(segment: Segment): SnapFit.Result? =
+        SnapFit.fromMask(segment.mask, segment.width, segment.height, segment.tapX, segment.tapY)?.scaled(1.0 / segment.scale)
+
+    /** GrabCut around one tap; null when it found nothing there. Off the main thread. */
+    fun segment(frame: Bitmap, tapX: Float, tapY: Float): Segment? {
         if (!openCvReady || frame.width < 2 || frame.height < 2) return null
         val scale = min(1.0, WORK_SIDE.toDouble() / max(frame.width, frame.height))
         val w = max(2, (frame.width * scale).roundToInt())
@@ -108,7 +121,7 @@ object CakeSnapper {
             // GC_FGD (1) and GC_PR_FGD (3) are the odd labels.
             val cake = BooleanArray(w * h) { labels[it].toInt() and 1 == 1 }
             if (echoesSeed(cake, w, h, tx, ty, likely)) return null
-            return SnapFit.fromMask(cake, w, h, tx, ty)?.scaled(1.0 / scale)
+            return Segment(cake, w, h, scale, tx, ty)
         } catch (e: Exception) {
             Log.w(TAG, "Snap failed", e)
             return null

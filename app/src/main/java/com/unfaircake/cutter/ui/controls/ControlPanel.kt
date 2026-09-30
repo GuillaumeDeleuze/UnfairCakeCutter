@@ -119,6 +119,7 @@ class ControlActions(
     val onClearOutline: () -> Unit,
     val onDismissRigTip: () -> Unit,
     val onDismissSnapTip: () -> Unit,
+    val onShare: () -> Unit,
 )
 
 /** How far the panel's rounded top rides up over the camera preview. */
@@ -181,7 +182,7 @@ fun ControlPanel(
                     )
                 }
             }
-            item(key = "unfairness", contentType = "unfairness") { UnfairnessHeader(state) }
+            item(key = "unfairness", contentType = "unfairness") { UnfairnessHeader(state, actions.onShare) }
             item(key = "slider") { UnfairnessSlider(state, actions, Modifier.padding(top = 20.dp)) }
             item(key = "people") { PeopleRow(state.peopleCount, actions, Modifier.padding(top = 20.dp)) }
             item(key = "shape") { ShapeControls(state, actions, Modifier.padding(top = 20.dp)) }
@@ -252,7 +253,7 @@ private fun TipCard(title: String, body: String, color: Color, onDismiss: () -> 
 }
 
 @Composable
-private fun UnfairnessHeader(state: CakeUiState) {
+private fun UnfairnessHeader(state: CakeUiState, onShare: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             SectionLabel(stringResource(R.string.unfairness), Modifier.weight(1f))
@@ -317,11 +318,32 @@ private fun UnfairnessHeader(state: CakeUiState) {
         } else {
             stringResource(R.string.biggest_vs_smallest, Shares.formatRatio(state.maxMinRatio))
         }
-        Text(ratio, fontFamily = Bricolage, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Candy.Ink)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                ratio,
+                fontFamily = Bricolage,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Candy.Ink,
+                modifier = Modifier.weight(1f),
+            )
+            CandyButton(
+                onClick = onShare,
+                container = Candy.Pink,
+                height = 40.dp,
+                shadow = 3.dp,
+                border = 2.5.dp,
+                horizontalPadding = 14.dp,
+                fontSize = 15,
+            ) {
+                Icon(CandyIcons.Share, contentDescription = null, tint = Candy.Ink, modifier = Modifier.size(17.dp))
+                Text(stringResource(R.string.share))
+            }
+        }
     }
 }
 
-private fun Verdict.label(): Int = when (this) {
+internal fun Verdict.label(): Int = when (this) {
     Verdict.PERFECTLY_FAIR -> R.string.verdict_fair
     Verdict.SLIGHTLY_GENEROUS -> R.string.verdict_slightly
     Verdict.SUSPICIOUS -> R.string.verdict_suspicious
