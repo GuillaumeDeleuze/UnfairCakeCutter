@@ -150,6 +150,7 @@ fun CakeApp(viewModel: CakeViewModel = viewModel()) {
             onRotationChange = viewModel::setRotation,
             onNameChange = viewModel::setName,
             onToggleFavorite = viewModel::toggleFavorite,
+            onClearOutline = viewModel::clearOutline,
             onDismissRigTip = {
                 showRigTip = false
                 prefs.edit().putBoolean(KEY_RIG_TIP_DISMISSED, true).apply()
@@ -266,6 +267,7 @@ private fun PreviewArea(
                 snapping = snap.aiming,
                 onSnapTap = { position, size -> snap.onTap(position, size, state.shape) },
                 snapToken = snap.token,
+                freeform = state.outline,
                 // Leave the part hidden under the panel out of the cake's working area.
                 modifier = Modifier.fillMaxSize().padding(bottom = PanelOverlap),
             )

@@ -21,8 +21,9 @@ import kotlin.math.sqrt
 object SnapFit {
 
     /**
-     * An outline in mask pixels. [width] runs along the rotated x axis; [rotationDeg] is in
-     * [-45, 45] so the outline never turns more than it has to.
+     * The cake's frame in mask pixels: centre, sides ([width] along the rotated x axis) and a
+     * turn in [-45, 45]. [outline] is the cake's own shape in that frame, scaled to the unit box
+     * (x and y in [-0.5, 0.5]). [round] says how to cut it: wedges, or strips and grids.
      */
     data class Result(
         val round: Boolean,
@@ -31,6 +32,7 @@ object SnapFit {
         val width: Double,
         val height: Double,
         val rotationDeg: Double,
+        val outline: List<Pt> = emptyList(),
     ) {
         fun scaled(f: Double) = copy(cx = cx * f, cy = cy * f, width = width * f, height = height * f)
     }
@@ -41,6 +43,16 @@ object SnapFit {
 
     /** Overlap (intersection over union) below which the piece has no recognisable shape. */
     private const val MIN_IOU = 0.72
+
+    /**
+     * Outline area over its smallest rectangle, above which it is a tray. An oval scores π/4
+     * (0.79), a round cake with its side showing about 0.82, a dish with rounded corners 0.9+.
+     */
+    private const val TRAY_RECTANGULARITY = 0.87
+
+    /** Outline simplification, in mask pixels, and the most points it may keep. */
+    private const val SIMPLIFY = 1.0
+    private const val MAX_POINTS = 120
 
     /** Ovals closer to a circle than this are left unturned. */
     private const val CIRCLE_RATIO = 1.08
@@ -102,11 +114,106 @@ object SnapFit {
         // An oval with variance l along an axis has semi-axis 2√l; a rectangle, half side √(3l).
         val oval = Model(round = true, mx, my, 2 * sqrt(major), 2 * sqrt(minor), theta)
         val tray = Model(round = false, mx, my, sqrt(3 * major), sqrt(3 * minor), theta)
-        val ovalIou = iou(piece, width, height, oval)
-        val trayIou = iou(piece, width, height, tray)
-        val best = if (ovalIou >= trayIou) oval else tray
-        if (max(ovalIou, trayIou) < MIN_IOU) return null
-        return best.toResult()
+        // Neither an oval nor a tray covers it well: a spill, a shadow, not a cake.
+        if (max(iou(piece, width, height, oval), iou(piece, width, height, tray)) < MIN_IOU) return null
+
+        val traced = trace(piece, width, height) ?: return null
+        var ring = Freeform.simplify(traced, SIMPLIFY)
+        var eps = SIMPLIFY
+        while (ring.size > MAX_POINTS / 2) {
+            eps *= 1.5
+            ring = Freeform.simplify(traced, eps)
+        }
+        ring = Freeform.smooth(ring)
+
+        val isTray = Freeform.rectangularity(ring) >= TRAY_RECTANGULARITY
+        // Trays line up with their sides; round cakes with their long axis.
+        val angle = if (isTray) Freeform.minAreaRect(ring).angle else theta
+        return frameAround(ring, round = !isTray, angle)
+    }
+
+    /**
+     * The frame turned by [angle] (then brought within ±45° by swapping sides) that fits
+     * [ring] snugly, and [ring] expressed in it.
+     */
+    private fun frameAround(ring: List<Pt>, round: Boolean, angle: Double): Result {
+        var deg = angle * 180.0 / PI
+        while (deg > 45.0) deg -= 90.0
+        while (deg < -45.0) deg += 90.0
+        var t = deg * PI / 180.0
+        fun extents(t: Double): DoubleArray {
+            val c = cos(t)
+            val s = sin(t)
+            var u0 = Double.MAX_VALUE
+            var u1 = -Double.MAX_VALUE
+            var v0 = Double.MAX_VALUE
+            var v1 = -Double.MAX_VALUE
+            for (p in ring) {
+                val u = p.x * c + p.y * s
+                val v = -p.x * s + p.y * c
+                u0 = min(u0, u); u1 = max(u1, u)
+                v0 = min(v0, v); v1 = max(v1, v)
+            }
+            return doubleArrayOf(u0, u1, v0, v1)
+        }
+        var e = extents(t)
+        if (round && max(e[1] - e[0], e[3] - e[2]) < CIRCLE_RATIO * min(e[1] - e[0], e[3] - e[2])) {
+            // Near circle: no point turning it.
+            deg = 0.0
+            t = 0.0
+            e = extents(0.0)
+        }
+        val c = cos(t)
+        val s = sin(t)
+        val w = max(e[1] - e[0], 1e-6)
+        val h = max(e[3] - e[2], 1e-6)
+        val um = (e[0] + e[1]) / 2
+        val vm = (e[2] + e[3]) / 2
+        val local = ring.map { p ->
+            val u = p.x * c + p.y * s
+            val v = -p.x * s + p.y * c
+            Pt((u - um) / w, (v - vm) / h)
+        }
+        return Result(
+            round = round,
+            cx = um * c - vm * s,
+            cy = um * s + vm * c,
+            width = w,
+            height = h,
+            rotationDeg = deg,
+            outline = local,
+        )
+    }
+
+    /**
+     * The piece's outer boundary as a ring of pixel corners, clockwise on screen. Built from the
+     * pixel sides that face outside, chained end to start; the longest loop wins.
+     */
+    private fun trace(piece: BooleanArray, width: Int, height: Int): List<Pt>? {
+        val stride = width + 1
+        val next = HashMap<Int, Int>()
+        fun inside(x: Int, y: Int) = x in 0 until width && y in 0 until height && piece[y * width + x]
+        fun corner(x: Int, y: Int) = y * stride + x
+        for (y in 0 until height) for (x in 0 until width) {
+            if (!piece[y * width + x]) continue
+            if (!inside(x, y - 1)) next[corner(x, y)] = corner(x + 1, y)
+            if (!inside(x + 1, y)) next[corner(x + 1, y)] = corner(x + 1, y + 1)
+            if (!inside(x, y + 1)) next[corner(x + 1, y + 1)] = corner(x, y + 1)
+            if (!inside(x - 1, y)) next[corner(x, y + 1)] = corner(x, y)
+        }
+        var best: List<Pt>? = null
+        val seen = HashSet<Int>()
+        for (start in next.keys) {
+            if (start in seen) continue
+            val loop = ArrayList<Pt>()
+            var k = start
+            while (seen.add(k)) {
+                loop += Pt((k % stride).toDouble(), (k / stride).toDouble())
+                k = next[k] ?: break
+            }
+            if (best == null || loop.size > best.size) best = loop
+        }
+        return best?.takeIf { it.size >= 8 }
     }
 
     /** Which cake the outline is, keeping the user's tray layout when it still fits. */
@@ -150,22 +257,6 @@ object SnapFit {
 
         /** Half extent of the model's bounding box, for the overlap scan. */
         val reach: Double get() = if (round) a else sqrt(a * a + b * b)
-
-        fun toResult(): Result {
-            var w = 2 * a
-            var h = 2 * b
-            var deg = theta * 180.0 / PI
-            // Keep the turn within ±45°: past that, swap the sides instead.
-            if (deg > 45.0) {
-                deg -= 90.0
-                w = h.also { h = w }
-            } else if (deg < -45.0) {
-                deg += 90.0
-                w = h.also { h = w }
-            }
-            if (round && max(w, h) < CIRCLE_RATIO * min(w, h)) deg = 0.0
-            return Result(round, cx, cy, w, h, deg)
-        }
     }
 
     private fun iou(piece: BooleanArray, width: Int, height: Int, model: Model): Double {

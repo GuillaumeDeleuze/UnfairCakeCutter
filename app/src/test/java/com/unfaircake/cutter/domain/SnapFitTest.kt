@@ -180,4 +180,56 @@ class SnapFitTest {
         val m = mask(160.0, 120.0, 175.0, 80.0, 0.0, round = true)
         assertNotNull(SnapFit.fromMask(m, w, h, 160, 120))
     }
+
+    /** The outline back in mask pixels. */
+    private fun outlineInMask(r: SnapFit.Result): List<Pt> {
+        val t = r.rotationDeg * PI / 180.0
+        return r.outline.map { p ->
+            val u = p.x * r.width
+            val v = p.y * r.height
+            Pt(r.cx + u * cos(t) - v * sin(t), r.cy + u * sin(t) + v * cos(t))
+        }
+    }
+
+    @Test
+    fun outlineFollowsTheCake() {
+        // A wonky pizza: circle with a bumpy rim.
+        val m = BooleanArray(w * h)
+        for (y in 0 until h) for (x in 0 until w) {
+            val dx = x + 0.5 - 160
+            val dy = y + 0.5 - 120
+            val t = kotlin.math.atan2(dy, dx)
+            val r = 80 + 8 * sin(5 * t)
+            if (dx * dx + dy * dy <= r * r) m[y * w + x] = true
+        }
+        val r = SnapFit.fromMask(m, w, h, 160, 120)!!
+        assertTrue(r.round)
+        assertTrue("points ${r.outline.size}", r.outline.size in 12..160)
+        // Local outline fits its unit box.
+        assertTrue(r.outline.all { abs(it.x) <= 0.5001 && abs(it.y) <= 0.5001 })
+        val poly = outlineInMask(r)
+        assertEquals(m.count { it }.toDouble(), Freeform.area(poly), 0.03 * m.count { it })
+        // The bumps survive: the outline is not an ellipse.
+        val c = Freeform.centroid(poly)
+        val reaches = (0 until 72).map { Freeform.reach(poly, c, 2 * PI * it / 72) }
+        assertTrue(reaches.max() - reaches.min() > 10.0)
+    }
+
+    @Test
+    fun trayOutlineHasStraightSidesAndRightAngle() {
+        val m = mask(170.0, 120.0, 100.0, 60.0, -12.0, round = false)
+        val r = SnapFit.fromMask(m, w, h, 200, 130)!!
+        assertFalse(r.round)
+        assertEquals(1.0, Freeform.rectangularity(r.outline), 0.05)
+    }
+
+    @Test
+    fun roundCakeWithItsSideShowingIsStillRound() {
+        // Seen from across the table: the top oval plus the side band below it.
+        val m = mask(160.0, 110.0, 110.0, 60.0, 0.0, round = true)
+        mask(160.0, 135.0, 110.0, 25.0, 0.0, round = false, into = m)
+        mask(160.0, 160.0, 110.0, 60.0, 0.0, round = true, into = m)
+        val r = SnapFit.fromMask(m, w, h, 160, 120)!!
+        assertTrue("round", r.round)
+    }
 }

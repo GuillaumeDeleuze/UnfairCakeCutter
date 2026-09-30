@@ -9,6 +9,7 @@ import com.unfaircake.cutter.domain.DEFAULT_PEOPLE
 import com.unfaircake.cutter.domain.DEFAULT_UNFAIRNESS
 import com.unfaircake.cutter.domain.MAX_PEOPLE
 import com.unfaircake.cutter.domain.MIN_PEOPLE
+import com.unfaircake.cutter.domain.Pt
 import com.unfaircake.cutter.domain.ShapeTransform
 import com.unfaircake.cutter.domain.Shares
 import com.unfaircake.cutter.domain.Verdict
@@ -38,6 +39,8 @@ data class CakeUiState(
     val photoUri: Uri?,
     /** Person secretly handed the biggest slice, or -1. */
     val favorite: Int,
+    /** The snapped cake's own outline in its unit box, or null for a plain oval or rectangle. */
+    val outline: List<Pt>?,
 ) {
     val peopleCount: Int get() = people.size
     val shares: List<Double> get() = people.map { it.share }
@@ -68,6 +71,9 @@ class CakeViewModel(
         ?.let { ShapeTransform(it[0], it[1], it[2], it[3], it[4]).clamped() }
         ?: ShapeTransform.defaultFor(shape)
     private var favorite: Int = savedState.get<Int>(KEY_FAVORITE) ?: NO_FAVORITE
+    private var outline: List<Pt>? = savedState.get<FloatArray>(KEY_OUTLINE)
+        ?.takeIf { it.size >= 6 && it.size % 2 == 0 }
+        ?.let { a -> List(a.size / 2) { Pt(a[2 * it].toDouble(), a[2 * it + 1].toDouble()) } }
     private var frozen: Boolean = false
     private var photoUri: Uri? = null
 
@@ -127,7 +133,9 @@ class CakeViewModel(
 
     fun setShape(value: CakeShape) {
         if (value == shape) return
-        val keepSize = !shape.isRound && !value.isRound && shape != CakeShape.LOG && value != CakeShape.LOG
+        // A snapped outline stays where it is: only the way it is cut changes.
+        val keepSize = outline != null ||
+            (!shape.isRound && !value.isRound && shape != CakeShape.LOG && value != CakeShape.LOG)
         transform = if (keepSize) {
             transform
         } else {
@@ -145,10 +153,18 @@ class CakeViewModel(
         commit()
     }
 
-    /** Outline found by Snap: the kind of cake and where it is, in one go. */
-    fun applySnap(value: CakeShape, t: ShapeTransform) {
+    /** Cake found by Snap: how to cut it, where it is and its own outline, in one go. */
+    fun applySnap(value: CakeShape, t: ShapeTransform, snapped: List<Pt>?) {
         shape = value
         transform = t.clamped()
+        outline = snapped?.takeIf { it.size >= 3 }
+        commit()
+    }
+
+    /** Back to a plain oval or rectangle, in the same place. */
+    fun clearOutline() {
+        if (outline == null) return
+        outline = null
         commit()
     }
 
@@ -202,6 +218,9 @@ class CakeViewModel(
         savedState[KEY_NAMES] = ArrayList(names)
         savedState[KEY_SHAPE] = shape.name
         savedState[KEY_FAVORITE] = favorite
+        savedState[KEY_OUTLINE] = outline?.let { pts ->
+            FloatArray(pts.size * 2) { i -> if (i % 2 == 0) pts[i / 2].x.toFloat() else pts[i / 2].y.toFloat() }
+        }
         savedState[KEY_TRANSFORM] = floatArrayOf(
             transform.cx, transform.cy, transform.width, transform.height, transform.rotationDeg,
         )
@@ -224,6 +243,7 @@ class CakeViewModel(
             frozen = frozen,
             photoUri = photoUri,
             favorite = if (favorite < count) favorite else NO_FAVORITE,
+            outline = outline,
         )
     }
 
@@ -239,6 +259,7 @@ class CakeViewModel(
         private const val KEY_SHAPE = "shape"
         private const val KEY_TRANSFORM = "transform"
         private const val KEY_FAVORITE = "favorite"
+        private const val KEY_OUTLINE = "outline"
         const val NO_FAVORITE = -1
 
         /** Whoever holds the phone is person 1. */

@@ -23,6 +23,8 @@
     <string name="snap_busy">Sniffing it out…</string>
     <string name="snap_missed">No cake there. Try again?</string>
     <string name="snap_done">Snapped!</string>
+    <string name="snapped_outline">Cut to the cake\'s real shape</string>
+    <string name="snapped_outline_reset">Reset</string>
 
     <!-- Preview status chip -->
     <string name="status_live">● LIVE</string>

@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -52,6 +53,8 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.unfaircake.cutter.domain.CakeGeometry
 import com.unfaircake.cutter.domain.CakeShape
+import com.unfaircake.cutter.domain.Freeform
+import com.unfaircake.cutter.domain.Pt
 import com.unfaircake.cutter.domain.MAX_SHAPE_SIZE
 import com.unfaircake.cutter.domain.MIN_SHAPE_SIZE
 import com.unfaircake.cutter.domain.RectD
@@ -93,6 +96,7 @@ fun CakeOverlay(
     snapping: Boolean = false,
     onSnapTap: (Offset, IntSize) -> Unit = { _, _ -> },
     snapToken: Int = 0,
+    freeform: List<Pt>? = null,
 ) {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
@@ -128,6 +132,7 @@ fun CakeOverlay(
     }
 
     val currentShape by rememberUpdatedState(shape)
+    val currentFreeform by rememberUpdatedState(freeform)
     val currentTransform by rememberUpdatedState(transform)
     val currentOnChange by rememberUpdatedState(onTransformChange)
     val currentSnapping by rememberUpdatedState(snapping)
@@ -174,7 +179,8 @@ fun CakeOverlay(
                     }
                 }
 
-                frame.contains(downPos, currentShape.isRound) -> {
+                // A snapped outline is grabbed anywhere in its box.
+                frame.contains(downPos, currentShape.isRound && currentFreeform == null) -> {
                     down.consume()
                     do {
                         val event = awaitPointerEvent()
@@ -209,7 +215,7 @@ fun CakeOverlay(
             .semantics { contentDescription = description },
     ) {
         val frame = shownTransform.toFrame(size.width, size.height)
-        drawCake(frame, shape, shown, percentLabels, textMeasurer, labelStyle, metrics)
+        drawCake(frame, shape, shown, percentLabels, textMeasurer, labelStyle, metrics, freeform)
     }
 }
 
@@ -296,18 +302,32 @@ private fun DrawScope.drawCake(
     textMeasurer: TextMeasurer,
     labelStyle: TextStyle,
     m: OverlayMetrics,
+    freeform: List<Pt>?,
 ) {
     val hw = frame.width / 2f
     val hh = frame.height / 2f
     val bounds = Rect(-hw, -hh, hw, hh)
-    val outline = Path().apply { if (shape.isRound) addOval(bounds) else addRect(bounds) }
+    // The snapped cake's own outline, in pixels of the local frame.
+    val poly = freeform?.map { Pt(it.x * frame.width, it.y * frame.height) }
+    val outline = Path().apply {
+        when {
+            poly != null -> addPolygon(poly)
+            shape.isRound -> addOval(bounds)
+            else -> addRect(bounds)
+        }
+    }
 
     val texts = shares.indices.map { i -> "${i + 1} · ${percentLabels.getOrElse(i) { "" }}" }
     val layouts = texts.map { textMeasurer.measure(AnnotatedString(it), style = labelStyle) }
+    val labelSizes = layouts.map { Size(it.size.width.toFloat(), it.size.height.toFloat()) }
 
     val pieces: List<Path>
     val labels: List<PieceLabel>
-    when (shape) {
+    if (poly != null) {
+        val cut = freeformPieces(poly, outline, shape, shares, frame, hw, hh, labelSizes, m)
+        pieces = cut.first
+        labels = cut.second
+    } else when (shape) {
         CakeShape.ROUND -> {
             val wedges = CakeGeometry.wedges(shares)
             val single = wedges.size == 1
@@ -330,7 +350,7 @@ private fun DrawScope.drawCake(
             val rects = CakeGeometry.strips(shares, w, h)
             val alongX = CakeGeometry.stripsAlongX(w, h)
             pieces = rects.map { rectPath(it) }
-            labels = stripLabels(rects, alongX, hw, hh, layouts.map { Size(it.size.width.toFloat(), it.size.height.toFloat()) }, m)
+            labels = stripLabels(rects, alongX, hw, hh, labelSizes, m)
         }
     }
 
@@ -361,7 +381,7 @@ private fun DrawScope.drawCake(
         }
 
         // Bounding box (for ovals) and corner handles.
-        if (shape.isRound) {
+        if (shape.isRound || poly != null) {
             drawRect(
                 Color.White.copy(alpha = 0.7f),
                 topLeft = Offset(-hw, -hh),
@@ -439,6 +459,80 @@ private fun stripLabels(
             }
         }
     }
+}
+
+/** Pieces and labels for a snapped outline, cut by area share within its real shape. */
+private fun freeformPieces(
+    poly: List<Pt>,
+    outline: Path,
+    shape: CakeShape,
+    shares: List<Double>,
+    frame: ShapeFrame,
+    hw: Float,
+    hh: Float,
+    labelSizes: List<Size>,
+    m: OverlayMetrics,
+): Pair<List<Path>, List<PieceLabel>> = when (shape) {
+    CakeShape.ROUND -> {
+        val c = Freeform.centroid(poly)
+        val wedges = Freeform.wedges(poly, shares)
+        if (wedges.size <= 1) {
+            listOf(outline) to wedges.indices.map { PieceLabel(it, Offset(c.x.toFloat(), c.y.toFloat())) }
+        } else {
+            // A fan wide enough to reach past the outline, trimmed to it.
+            val far = 2f * (frame.width + frame.height)
+            val paths = wedges.map { w -> Path.combine(PathOperation.Intersect, outline, fanPath(w, c, far)) }
+            val labels = wedges.mapIndexed { i, w ->
+                val r = Freeform.reach(poly, c, w.mid) * if (w.sweep < PI / 6) 0.72 else 0.6
+                PieceLabel(i, Offset((c.x + r * cos(w.mid)).toFloat(), (c.y + r * sin(w.mid)).toFloat()))
+            }
+            paths to labels
+        }
+    }
+
+    CakeShape.TRAY_GRID -> {
+        val parts = Freeform.grid(poly, shares)
+        parts.map { polygonPath(it) } to parts.mapIndexed { i, p ->
+            val c = Freeform.centroid(p)
+            PieceLabel(i, Offset(c.x.toFloat(), c.y.toFloat()))
+        }
+    }
+
+    CakeShape.TRAY_STRIPS, CakeShape.LOG -> {
+        val alongX = CakeGeometry.stripsAlongX(frame.width.toDouble(), frame.height.toDouble())
+        val parts = Freeform.strips(poly, shares, alongX)
+        // Strip labels only need each strip's extent along the cut direction.
+        val rects = parts.map { p ->
+            if (p.isEmpty()) {
+                RectD(0.0, 0.0, 0.0, 0.0)
+            } else {
+                val x0 = p.minOf { it.x }
+                val y0 = p.minOf { it.y }
+                RectD(x0, y0, p.maxOf { it.x } - x0, p.maxOf { it.y } - y0)
+            }
+        }
+        parts.map { polygonPath(it) } to stripLabels(rects, alongX, hw, hh, labelSizes, m)
+    }
+}
+
+private fun Path.addPolygon(poly: List<Pt>) {
+    if (poly.isEmpty()) return
+    moveTo(poly[0].x.toFloat(), poly[0].y.toFloat())
+    for (i in 1 until poly.size) lineTo(poly[i].x.toFloat(), poly[i].y.toFloat())
+    close()
+}
+
+private fun polygonPath(poly: List<Pt>): Path = Path().apply { addPolygon(poly) }
+
+/** A wedge of radius [far] around [c], for trimming to the cake's outline. */
+private fun fanPath(wedge: Wedge, c: Pt, far: Float): Path = Path().apply {
+    moveTo(c.x.toFloat(), c.y.toFloat())
+    val steps = max(2, ceil(wedge.sweep / (PI / 90.0)).toInt())
+    for (s in 0..steps) {
+        val t = wedge.start + wedge.sweep * s / steps
+        lineTo((c.x + far * cos(t)).toFloat(), (c.y + far * sin(t)).toFloat())
+    }
+    close()
 }
 
 private fun wedgePath(wedge: Wedge, a: Float, b: Float): Path = Path().apply {

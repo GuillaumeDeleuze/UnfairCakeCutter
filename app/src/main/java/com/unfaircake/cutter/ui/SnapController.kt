@@ -109,6 +109,7 @@ class SnapController(private val scope: CoroutineScope, private val viewModel: C
             viewModel.applySnap(
                 SnapFit.shapeFor(result, currentShape),
                 SnapFit.toTransform(result, overlaySize.width.toFloat(), overlaySize.height.toFloat()),
+                result.outline,
             )
             token++
             // The frame stays frozen: the outline was fitted to it.

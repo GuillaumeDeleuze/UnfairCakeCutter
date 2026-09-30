@@ -113,6 +113,7 @@ class ControlActions(
     val onRotationChange: (Float) -> Unit,
     val onNameChange: (Int, String) -> Unit,
     val onToggleFavorite: (Int) -> Unit,
+    val onClearOutline: () -> Unit,
     val onDismissRigTip: () -> Unit,
 )
 
@@ -134,15 +135,17 @@ fun ControlPanel(
             .clip(shape)
             .background(Candy.Cream)
             .drawBehind {
-                // Ink rule along the top edge and around the two rounded corners only.
+                // Ink rule over the top and its rounded corners, then down both sides.
                 val w = 3.dp.toPx()
                 val r = PanelCorner.toPx()
                 val half = w / 2f
                 val edge = Path().apply {
-                    moveTo(half, r + half)
+                    moveTo(half, size.height)
+                    lineTo(half, r)
                     arcTo(Rect(half, half, 2 * r - half, 2 * r - half), 180f, 90f, false)
                     lineTo(size.width - r, half)
                     arcTo(Rect(size.width - 2 * r + half, half, size.width - half, 2 * r - half), 270f, 90f, false)
+                    lineTo(size.width - half, size.height)
                 }
                 drawPath(edge, Candy.Ink, style = Stroke(width = w))
             },
@@ -409,6 +412,37 @@ private fun ShapeControls(state: CakeUiState, actions: ControlActions, modifier:
                 selected = state.shape,
                 onSelect = actions.onShapeChange,
             )
+        }
+        if (state.outline != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Candy.Track, Pill)
+                    .border(2.5.dp, Candy.Ink, Pill)
+                    .padding(start = 14.dp, end = 5.dp, top = 5.dp, bottom = 5.dp),
+            ) {
+                Icon(CandyIcons.Wand, contentDescription = null, tint = Candy.Ink, modifier = Modifier.size(16.dp))
+                Text(
+                    stringResource(R.string.snapped_outline),
+                    fontFamily = Bricolage,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Candy.Ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                )
+                CandyButton(
+                    onClick = actions.onClearOutline,
+                    container = Candy.White,
+                    height = 36.dp,
+                    shadow = 2.dp,
+                    border = 2.5.dp,
+                    horizontalPadding = 14.dp,
+                    fontSize = 14,
+                ) { Text(stringResource(R.string.snapped_outline_reset)) }
+            }
         }
         LabeledSlider(
             label = stringResource(R.string.size),
